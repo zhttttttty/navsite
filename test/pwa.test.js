@@ -117,16 +117,23 @@ test('homepage uses the modern local visual system without external fonts', () =
   assert.doesNotMatch(index, /fonts\.googleapis\.com|Orbitron/);
   assert.doesNotMatch(css, /font-family:\s*["']Orbitron/);
   assert.match(index, /class="search-capsule"/);
-  assert.match(index, /class="search-actions search-secondary-actions"/);
+  assert.doesNotMatch(index, /class="search-actions search-secondary-actions"/);
+  assert.match(index, /class="header-actions"[\s\S]*id="view-mode-toggle"[\s\S]*id="manage-links-btn"[\s\S]*id="desktop-theme-toggle-btn"/);
   assert.match(css, /v1\.7：现代深空视觉系统/);
   assert.match(css, /width: min\(100%, 980px\)/);
   assert.match(css, /\.search-capsule > select \{[\s\S]*?width: 118px/);
   assert.match(css, /@media \(max-width: 768px\)[\s\S]*?\.search-capsule > select \{[\s\S]*?width: 112px/);
+  assert.match(css, /v1\.8：全局操作归位与快速启动层级/);
+  assert.match(css, /body\.edit-mode #add-link-btn/);
+  assert.match(css, /\.personal-tools-grid \{[\s\S]*?overflow-x: auto/);
   assert.match(css, /\.tool-domain/);
   assert.match(renderer, /getDisplayHostname/);
   assert.match(renderer, /tool-open-indicator/);
   assert.match(themeManager, /name: '深空灰'/);
   assert.match(themeManager, /primaryBg: '#0B0F17'/);
+  assert.match(themeManager, /syncSkinSelectorLocation\(\)/);
+  assert.match(themeManager, /mobileActions\.insertBefore\(skinSelector, mobileThemeToggle\)/);
+  assert.match(themeManager, /headerActions\.insertBefore\(skinSelector, desktopThemeToggle\)/);
 });
 
 test('command palette supports local pinyin matching and keyboard navigation', () => {
