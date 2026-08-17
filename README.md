@@ -112,6 +112,8 @@
 
 📖 [查看配置指南 →](./doc/飞书多维表格设置.md)
 
+字段名称必须使用 `name`、`url`、`category`、`weight`；可选字段为 `icon`、`desc`、`visible`。其中 `url` 当前应设置为“单行文本”。字段名不一致会导致 `FieldNameNotFound`。
+
 示例数据可以看这里： [示例数据](https://pcnz0m411rr0.feishu.cn/base/QqmhbhUqRaGCjHs6l9XcKJtEnIc?table=tblva1FKxYGEZ7ce&view=vewbqWfrEv)
 
 ### 💻 步骤3: 本地启动开发
