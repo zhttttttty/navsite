@@ -102,6 +102,20 @@ test('homepage exposes search, grouped navigation and explicit management mode',
   assert.match(app, /classList\.toggle\('edit-mode'\)/);
 });
 
+test('navigation avatars use remote images with a local logo fallback', () => {
+  const index = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
+  const app = fs.readFileSync(path.join(projectRoot, 'public', 'js', 'app.js'), 'utf8');
+
+  assert.equal((index.match(/data-navigation-avatar/g) || []).length, 2);
+  assert.equal((index.match(/src="\/api\/navigation-avatar"/g) || []).length, 2);
+  assert.equal((index.match(/data-fallback-src="\.\/img\/logo\.png"/g) || []).length, 2);
+  assert.equal((index.match(/decoding="async"/g) || []).length, 2);
+  assert.doesNotMatch(index, /onerror=/);
+  assert.match(app, /function bindNavigationAvatarFallbacks\(\)/);
+  assert.match(app, /avatar\.addEventListener\('error', showFallback/);
+  assert.match(app, /avatar\.complete && avatar\.naturalWidth === 0/);
+});
+
 test('homepage uses the modern local visual system without external fonts', () => {
   const index = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
   const css = fs.readFileSync(path.join(projectRoot, 'public', 'css', 'style.css'), 'utf8');

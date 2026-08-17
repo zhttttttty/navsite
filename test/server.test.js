@@ -5,6 +5,7 @@ const axios = require('axios');
 const app = require('../server');
 const {
   fetchFavicon,
+  fetchNavigationAvatar,
   getBitableData,
   parseHttpUrl,
   processTableData
@@ -196,6 +197,24 @@ test('favicon fetching rejects invalid provider responses', async () => {
   };
 
   await assert.rejects(() => fetchFavicon('invalid-test.example', 64, client), /无效图片/);
+});
+
+test('navigation avatar proxy accepts image data from the fixed API', async () => {
+  const image = Buffer.alloc(256, 1);
+  const calls = [];
+  const client = {
+    async get(url, options) {
+      calls.push({ url, options });
+      return { data: image, headers: { 'content-type': 'image/webp' } };
+    }
+  };
+
+  const avatar = await fetchNavigationAvatar(client);
+  assert.equal(avatar.data, image);
+  assert.equal(avatar.contentType, 'image/webp');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://t.alcy.cc/ycy/');
+  assert.equal(calls[0].options.maxContentLength, 5 * 1024 * 1024);
 });
 
 test('table processing tolerates incomplete fields and prototype-like categories', () => {
