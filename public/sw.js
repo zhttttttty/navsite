@@ -1,6 +1,6 @@
 // Service Worker for 水果导航 PWA
-const STATIC_CACHE_NAME = 'fruit-nav-static-v1.6.0';
-const API_CACHE_NAME = 'fruit-nav-api-v1.6.0';
+const STATIC_CACHE_NAME = 'fruit-nav-static-v1.7.0';
+const API_CACHE_NAME = 'fruit-nav-api-v1.7.0';
 
 // 需要缓存的静态资源
 const STATIC_ASSETS = [
@@ -104,9 +104,7 @@ function isStaticAsset(request) {
            url.pathname === '/manifest.json';
   }
   
-  // 外部静态资源（字体、CSS等）
-  return url.hostname === 'fonts.googleapis.com' ||
-         url.hostname === 'cdn.jsdelivr.net';
+  return false;
 }
 
 // 判断是否为API请求
