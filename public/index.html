@@ -185,15 +185,21 @@
         <div class="site-search">
           <i class="bi bi-search search-symbol" aria-hidden="true"></i>
           <input id="site-search-input" type="search" autocomplete="off" placeholder="搜索网站、分类或域名" aria-label="搜索导航网站">
-          <kbd>Ctrl K</kbd>
+          <kbd>Ctrl K /</kbd>
         </div>
         <div class="search-actions">
           <select id="search-engine" aria-label="选择网络搜索引擎">
             <option value="bing">必应</option>
             <option value="baidu">百度</option>
             <option value="google">Google</option>
+            <option value="github">GitHub</option>
+            <option value="bilibili">Bilibili</option>
           </select>
           <button id="web-search-btn" type="button">搜索网络</button>
+          <button id="view-mode-toggle" class="view-mode-toggle" type="button" aria-pressed="false" title="切换到紧凑视图">
+            <i class="bi bi-grid" aria-hidden="true"></i>
+            <span>紧凑</span>
+          </button>
           <button id="manage-links-btn" class="manage-links-btn" type="button" aria-pressed="false">管理</button>
         </div>
       </section>
@@ -303,6 +309,25 @@
     </div>
   </div>
 
+  <div id="command-palette" class="command-palette" hidden>
+    <section class="command-palette-dialog" role="dialog" aria-modal="true" aria-labelledby="command-palette-title">
+      <header class="command-palette-header">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <label id="command-palette-title" class="sr-only" for="command-palette-input">快速搜索网站</label>
+        <input id="command-palette-input" type="search" autocomplete="off" placeholder="输入网站、分类、域名或拼音">
+        <button id="command-palette-close" type="button" aria-label="关闭快速搜索">Esc</button>
+      </header>
+      <div id="command-palette-results" class="command-palette-results" role="listbox" aria-label="搜索结果"></div>
+      <p id="command-palette-empty" class="command-palette-empty" hidden>没有找到匹配的网站</p>
+      <footer class="command-palette-footer">
+        <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
+        <span><kbd>Enter</kbd> 新标签打开</span>
+        <span><kbd>Esc</kbd> 关闭</span>
+      </footer>
+    </section>
+  </div>
+
+  <script src="vendor/pinyin-match/pinyin-match.js"></script>
   <script src="js/app.js"></script>
 </body>
 

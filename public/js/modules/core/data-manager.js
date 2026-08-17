@@ -51,15 +51,14 @@ class DataManager {
 
   // 获取导航数据
   async fetchNavigationData(forceRefresh = false) {
-    // 检查是否强制刷新
     if (!forceRefresh) {
-      // 尝试从LocalStorage读取缓存
       const cachedData = this.readCacheFromStorage();
       if (cachedData) {
         console.log('使用LocalStorage缓存数据');
         this.navigationData = cachedData.data;
         this.categories = cachedData.categories;
         this.dateInfo = cachedData.dateInfo;
+        setTimeout(() => this.refreshNavigationData(), 0);
         return {
           success: true,
           data: this.navigationData,
@@ -71,50 +70,69 @@ class DataManager {
     }
 
     try {
-      const response = await fetch('/api/navigation');
-
-      // 检查响应状态
-      if (!response.ok) {
-        console.warn(`API 请求失败: ${response.status} ${response.statusText}`);
-        return this.useDefaultNavigationData();
-      }
-
-      // 检查内容类型
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.warn('API 返回非 JSON 数据，使用默认数据');
-        return this.useDefaultNavigationData();
-      }
-
-      const result = await response.json();
-      console.log('获取导航数据:', result);
-
-      if (result.success) {
-        this.navigationData = result.data;
-        this.categories = result.categories;
-        this.dateInfo = result.dateInfo;
-        const isMockData = result.isMockData;
-
-        if (result.degraded) {
-          console.warn('导航服务当前处于降级状态，正在展示演示数据');
-        }
-
-        // 只有非模拟数据才进行缓存
-        if (!isMockData) {
-          console.log('非模拟数据，开始缓存...');
-          this.writeCacheToStorage(result.data, result.categories, result.dateInfo);
-        } else {
-          console.log('检测到模拟数据，不进行缓存');
-        }
-
-        return result;
-      } else {
-        console.warn('获取导航数据失败:', result.message);
-        return this.useDefaultNavigationData();
-      }
+      const result = await this.requestNavigationData();
+      return this.applyNavigationResult(result);
     } catch (error) {
       console.warn('获取导航数据异常:', error);
       return this.useDefaultNavigationData();
+    }
+  }
+
+  async requestNavigationData() {
+    const response = await fetch('/api/navigation');
+    if (!response.ok) {
+      throw new Error(`API 请求失败: ${response.status} ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('API 返回非 JSON 数据');
+    }
+
+    const result = await response.json();
+    if (!result.success) throw new Error(result.message || '获取导航数据失败');
+    return result;
+  }
+
+  applyNavigationResult(result) {
+    this.navigationData = result.data;
+    this.categories = result.categories;
+    this.dateInfo = result.dateInfo;
+
+    if (result.degraded) {
+      console.warn('导航服务当前处于降级状态，正在展示演示数据');
+    }
+
+    if (!result.isMockData) {
+      this.writeCacheToStorage(result.data, result.categories, result.dateInfo);
+    }
+    return result;
+  }
+
+  async refreshNavigationData() {
+    const previousData = JSON.stringify({
+      data: this.navigationData,
+      categories: this.categories,
+      dateInfo: this.dateInfo
+    });
+
+    try {
+      const result = await this.requestNavigationData();
+      if (result.isMockData || result.degraded) return;
+
+      this.applyNavigationResult(result);
+      const nextData = JSON.stringify({
+        data: this.navigationData,
+        categories: this.categories,
+        dateInfo: this.dateInfo
+      });
+      if (nextData !== previousData) {
+        window.dispatchEvent(new CustomEvent('navigationRefreshed', {
+          detail: { dateInfo: result.dateInfo }
+        }));
+      }
+    } catch (error) {
+      console.warn('后台刷新导航数据失败，继续使用本地缓存:', error);
     }
   }
 

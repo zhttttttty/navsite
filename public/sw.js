@@ -1,6 +1,6 @@
 // Service Worker for 水果导航 PWA
-const STATIC_CACHE_NAME = 'fruit-nav-static-v1.5.4';
-const API_CACHE_NAME = 'fruit-nav-api-v1.5.4';
+const STATIC_CACHE_NAME = 'fruit-nav-static-v1.6.0';
+const API_CACHE_NAME = 'fruit-nav-api-v1.6.0';
 
 // 需要缓存的静态资源
 const STATIC_ASSETS = [
@@ -15,9 +15,12 @@ const STATIC_ASSETS = [
   '/js/modules/core/theme-manager.js',
   '/js/modules/core/data-manager.js',
   '/js/modules/core/ui-renderer.js',
+  '/js/modules/features/command-palette.js',
   '/js/modules/features/link-manager.js',
   '/js/modules/features/interaction-manager.js',
+  '/js/modules/features/personalization-manager.js',
   '/js/modules/utils/common-utils.js',
+  '/vendor/pinyin-match/pinyin-match.js',
   '/img/logo.png',
   '/img/icons/icon-192x192.png',
   '/img/icons/icon-512x512.png',
