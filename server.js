@@ -296,7 +296,7 @@ function processTableData(items) {
     if (!rawName && !rawUrl) {
       return null;
     }
-    const rawSort = fields.sort ?? fields.排序 ?? 0;
+    const rawSort = fields.sort ?? fields.weight ?? fields.排序 ?? 0;
     const numericSort = Number(rawSort);
     const localizedIcon = fields.备用图标;
     return {
@@ -538,13 +538,10 @@ app.post('/api/links', adminWriteLimiter, requireAdmin, async (req, res) => {
     // 构建请求体，符合飞书多维表格API的要求
     const createRecordBody = {
       fields: {
-        '分类': category,
-        '排序': numericSort,
-        '站点名称': name,
-        '网址': {
-          'link': parsedUrl.href,
-          'text': name
-        }
+        name,
+        url: parsedUrl.href,
+        category,
+        weight: numericSort
       }
     };
     

@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { after, before, test } = require('node:test');
+const axios = require('axios');
 
 const app = require('../server');
 const {
@@ -92,6 +93,64 @@ test('link creation only accepts HTTP and HTTPS URLs', async () => {
   assert.match(body.message, /http/);
 });
 
+test('link creation writes the existing English Feishu field schema', async () => {
+  const originalPost = axios.post;
+  const originalEnvironment = {
+    APP_ID: process.env.APP_ID,
+    APP_SECRET: process.env.APP_SECRET,
+    APP_TOKEN: process.env.APP_TOKEN,
+    TABLE_ID: process.env.TABLE_ID
+  };
+  let recordBody;
+
+  process.env.ADMIN_TOKEN = 'Ab12x9';
+  process.env.APP_ID = 'app-id';
+  process.env.APP_SECRET = 'app-secret';
+  process.env.APP_TOKEN = 'app-token';
+  process.env.TABLE_ID = 'table-id';
+
+  axios.post = async (url, body) => {
+    if (url.includes('/tenant_access_token/')) {
+      return { data: { code: 0, tenant_access_token: 'tenant-token', expire: 7200 } };
+    }
+    recordBody = body;
+    return { data: { code: 0, data: { record: {} } } };
+  };
+
+  try {
+    const { response, body } = await request('/api/links', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer Ab12x9',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: 'ChatGPT',
+        url: 'https://chatgpt.com/',
+        category: 'Code',
+        sort: 200
+      })
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(body.success, true);
+    assert.deepEqual(recordBody, {
+      fields: {
+        name: 'ChatGPT',
+        url: 'https://chatgpt.com/',
+        category: 'Code',
+        weight: 200
+      }
+    });
+  } finally {
+    axios.post = originalPost;
+    for (const [key, value] of Object.entries(originalEnvironment)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test('link deletion validates record IDs before calling Feishu', async () => {
   process.env.ADMIN_TOKEN = 'Ab12x9';
   const { response, body } = await request('/api/links/bad%20id', {
@@ -142,12 +201,14 @@ test('favicon fetching rejects invalid provider responses', async () => {
 test('table processing tolerates incomplete fields and prototype-like categories', () => {
   const grouped = processTableData([
     { record_id: 'one', fields: { 站点名称: 'No URL', 分类: '其它' } },
-    { record_id: 'two', fields: { 站点名称: 'Safe', 网址: { link: 'https://example.com' }, 分类: '__proto__' } }
+    { record_id: 'two', fields: { 站点名称: 'Safe', 网址: { link: 'https://example.com' }, 分类: '__proto__' } },
+    { record_id: 'three', fields: { name: 'English', url: 'https://example.org', category: 'Code', weight: 250 } }
   ]);
 
   assert.equal(Object.getPrototypeOf(grouped), null);
   assert.equal(grouped['其它'][0].url, '');
   assert.equal(grouped['__proto__'][0].name, 'Safe');
+  assert.equal(grouped.Code[0].sort, 250);
 });
 
 test('Feishu records are read across all pages', async () => {
