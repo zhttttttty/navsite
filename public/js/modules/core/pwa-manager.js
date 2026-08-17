@@ -3,7 +3,6 @@
  */
 class PWAManager {
   constructor() {
-    this.deferredPrompt = null;
     this.init();
   }
 
@@ -11,7 +10,6 @@ class PWAManager {
     if ('serviceWorker' in navigator) {
       await this.registerServiceWorker();
     }
-    this.bindInstallEvents();
   }
 
   // Service Worker 注册
@@ -46,24 +44,6 @@ class PWAManager {
     } catch (error) {
       console.error('[PWA] Service Worker 注册失败:', error);
     }
-  }
-
-  // 绑定安装事件
-  bindInstallEvents() {
-    // PWA 安装提示
-    window.addEventListener('beforeinstallprompt', (e) => {
-      console.log('[PWA] 安装提示事件触发');
-      e.preventDefault();
-      this.deferredPrompt = e;
-      this.showInstallPrompt();
-    });
-
-    // PWA 安装成功
-    window.addEventListener('appinstalled', () => {
-      console.log('[PWA] PWA 安装成功');
-      this.showInstallSuccessMessage();
-      this.deferredPrompt = null;
-    });
   }
 
   // 显示更新通知
@@ -143,7 +123,7 @@ class PWAManager {
 
   // 显示安装提示
   showInstallPrompt() {
-    if (!this.deferredPrompt) return;
+    if (!this.deferredPrompt || !this.shouldShowInstallPrompt()) return;
 
     const prompt = document.createElement('div');
     prompt.className = 'pwa-install-prompt';
@@ -262,12 +242,6 @@ class PWAManager {
       localStorage.setItem('pwa-install-dismissed', Date.now());
     });
 
-    // 检查是否最近被拒绝过
-    const lastDismissed = localStorage.getItem('pwa-install-dismissed');
-    if (lastDismissed && (Date.now() - parseInt(lastDismissed)) < 7 * 24 * 60 * 60 * 1000) {
-      prompt.remove();
-      return;
-    }
   }
 
   // 显示安装成功消息

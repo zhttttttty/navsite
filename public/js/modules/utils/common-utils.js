@@ -222,99 +222,6 @@ function refreshToolIcons() {
   }
 }
 
-// 验证用户偏好持久化功能
-function validatePersistence() {
-  console.log('开始验证用户偏好持久化功能...');
-
-  if (!window.themeManager) {
-    console.error('主题管理器未初始化，无法进行持久化测试');
-    return false;
-  }
-
-  // 获取当前设置
-  const currentSkin = window.themeManager.getCurrentSkin();
-  const currentMode = window.themeManager.getCurrentMode();
-
-  console.log('当前设置:', { currentSkin, currentMode });
-
-  // 检查localStorage中的值
-  const savedSkin = localStorage.getItem('skin-theme');
-  const savedMode = localStorage.getItem('theme');
-
-  console.log('保存的设置:', { savedSkin, savedMode });
-
-  // 验证一致性
-  const skinMatch = savedSkin === currentSkin;
-  const modeMatch = savedMode === currentMode;
-
-  if (skinMatch && modeMatch) {
-    console.log('✅ 用户偏好持久化功能正常工作');
-    return true;
-  } else {
-    console.warn('⚠️ 用户偏好持久化功能存在问题:', {
-      skinMatch,
-      modeMatch,
-      expected: { currentSkin, currentMode },
-      actual: { savedSkin, savedMode }
-    });
-    return false;
-  }
-}
-
-// 测试完整的皮肤切换流程
-function testSkinSwitching() {
-  if (!window.themeManager) {
-    console.error('主题管理器未初始化');
-    return;
-  }
-
-  console.log('开始测试皮肤切换流程...');
-
-  const testSequence = [
-    { skin: 'ocean', mode: 'light' },
-    { skin: 'forest', mode: 'dark' },
-    { skin: 'sunset', mode: 'light' },
-    { skin: 'purple', mode: 'dark' },
-    { skin: 'classic', mode: 'light' },
-    { skin: 'neon', mode: 'dark' }
-  ];
-
-  let testIndex = 0;
-
-  function runNextTest() {
-    if (testIndex >= testSequence.length) {
-      console.log('✅ 所有皮肤切换测试完成');
-      return;
-    }
-
-    const test = testSequence[testIndex];
-    console.log(`测试 ${testIndex + 1}/${testSequence.length}: ${test.skin} - ${test.mode}`);
-
-    window.themeManager.setSkin(test.skin);
-    window.themeManager.setMode(test.mode);
-
-    // 验证设置是否正确应用
-    setTimeout(() => {
-      const currentSkin = window.themeManager.getCurrentSkin();
-      const currentMode = window.themeManager.getCurrentMode();
-
-      if (currentSkin === test.skin && currentMode === test.mode) {
-        console.log(`✅ 测试 ${testIndex + 1} 通过:`, { currentSkin, currentMode });
-      } else {
-        console.error(`❌ 测试 ${testIndex + 1} 失败:`, {
-          expected: test,
-          actual: { currentSkin, currentMode }
-        });
-      }
-
-      testIndex++;
-      setTimeout(runNextTest, 100);
-    }, 100);
-  }
-
-  runNextTest();
-}
-
 // 性能监控
 function initPerformanceMonitoring() {
   if ('performance' in window) {
@@ -357,8 +264,6 @@ window.utils = {
   updateModeToggleDisplay,
   toggleTheme,
   refreshToolIcons,
-  validatePersistence,
-  testSkinSwitching,
   initPerformanceMonitoring,
   initErrorHandling
 };

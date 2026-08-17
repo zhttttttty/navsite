@@ -7,14 +7,14 @@
 ## 技术栈
 
 - 前端：JavaScript (ES6+)
-- 缓存：LocalStorage + Memory Cache
+- 缓存：浏览器HTTP缓存 + CDN共享缓存 + Memory Cache
 - 服务：Google Favicon API (主要) + 本地代理备用
 
 ## 技术选型
 
 ### 主要方案：Google Favicon API
 ```
-https://www.google.com/s2/favicons?domain={domain}&size=32
+https://www.google.com/s2/favicons?domain={domain}&sz=64
 ```
 
 优势：
@@ -26,7 +26,7 @@ https://www.google.com/s2/favicons?domain={domain}&size=32
 ### 备用方案：本地代理服务
 如果Google服务不可用，使用本地服务器代理favicon请求：
 ```
-/api/favicon?url={encoded_url}
+/api/favicon?url={encoded_url}&size=64
 ```
 
 ## 数据库/接口设计
@@ -36,11 +36,9 @@ https://www.google.com/s2/favicons?domain={domain}&size=32
 const faviconCache = new Map(); // 内存缓存，避免重复请求
 ```
 
-### LocalStorage缓存
-```javascript
-// 键名格式：favicon_[domain]
-// 值：{ url: string, timestamp: number, ttl: number }
-```
+### HTTP缓存
+
+成功结果由浏览器缓存24小时、CDN缓存7天；失败结果短暂缓存，避免持续请求无效域名。
 
 ## 测试策略
 

@@ -22,6 +22,8 @@
 ### 🌟 项目亮点
 - **📱 PWA 应用**：支持离线访问和桌面安装，提供原生应用体验
 - **🌙 多种皮肤主题**：自动跟随系统偏好的暗黑模式，支持手动切换，多个皮肤主题随意切换
+- **🔍 双模式搜索**：输入时筛选导航网站，也可切换搜索引擎搜索网络
+- **🖼️ 自动网站图标**：通过同源代理获取高清 favicon，失败时稳定降级为文字图标
 - **⚡ 高性能**：智能缓存机制，快速响应，优秀的用户体验
 - **🔧 易部署**：一键部署到Vercel，后续支持多种部署方式
 
@@ -37,7 +39,7 @@
 
 - **原生JavaScript**：无框架依赖，轻量高效
 - **CSS3**：现代CSS特性，支持CSS变量和动画
-- **Bootstrap Icons**：图标库
+- **Bootstrap Icons**：自托管的界面图标库，避免运行时依赖第三方 CDN
 - **响应式设计**：移动端优先的设计理念
 
 ### 🔗 API集成
@@ -47,7 +49,7 @@
 
 ### 🌐 部署支持
 - **Vercel**：已配置vercel.json，支持一键部署 使用Vercel一键部署 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/wubh2012/navsite)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/zhttttttty/navsite)
 - **PWA 支持**：满足 Progressive Web App 标准，支持离线访问和桌面安装
 
 
@@ -60,7 +62,6 @@
 │   ├── js/
 │   │   └── app.js                  # 前端主逻辑
 │   ├── img/
-│   │   ├── avatar.svg              # 用户头像图标
 │   │   ├── favicon.ico             # 网站图标
 │   │   ├── icons/                  # PWA 图标资源目录
 │   │   │   ├── icon-72x72.png      # 多尺寸 PWA 图标
@@ -72,7 +73,11 @@
 │   ├── browserconfig.xml           # Microsoft 平台配置
 │   └── index.html                  # 主页面，响应式布局，包含PWA支持
 ├── doc/                            # 文档目录
+│   └── images/avatar.svg           # 归档的旧头像资源
+├── scripts/                        # 可重复执行的资源生成脚本
 ├── specs/                          # 规格说明
+├── test/                           # 自动化测试与手动测试页
+├── .github/                        # CI 与依赖更新配置
 ├── .env                            # 环境变量配置（不应提交到版本控制）
 ├── .env.example                    # 环境变量示例
 ├── .gitignore                      # Git忽略文件配置
@@ -87,7 +92,7 @@
 ### 📋 前置条件详细说明
 
 **必需条件：**
-- Node.js 14.0+ （[下载地址](https://nodejs.org/)）
+- Node.js 20.0+ （[下载地址](https://nodejs.org/)）
 - 飞书账号（免费注册：[飞书官网](https://www.feishu.cn/)）
 
 **可选条件：**
@@ -114,7 +119,7 @@
 1. **克隆或下载项目代码**
 
    ```bash
-   git clone https://github.com/wubh2012/navsite.git
+   git clone https://github.com/zhttttttty/navsite.git
    cd navsite
    ```
    
@@ -140,6 +145,9 @@
      # 飞书多维表格信息  
      APP_TOKEN=你的多维表格Token
      TABLE_ID=你的表格ID
+
+     # 保护添加和删除接口，建议使用至少32位随机值
+     ADMIN_TOKEN=你的管理员令牌
      
      # 服务器端口
      PORT=3000
@@ -149,6 +157,7 @@
    > - `.env`文件包含敏感信息，切勿提交到版本控制系统
    > - 生产环境请使用平台的环境变量配置功能
    > - 定期更换APP_SECRET以确保安全
+   > - `ADMIN_TOKEN`不能与其他密码复用，也不要写入前端代码
 
 4. **启动项目**
 
@@ -157,6 +166,14 @@
    ```
    
 5. **打开浏览器，访问** `http://localhost:3000`
+
+6. **运行本地验证**
+
+   ```bash
+   npm run verify
+   ```
+
+添加或删除网站时，页面会要求输入`ADMIN_TOKEN`。令牌只保存在当前浏览器会话中，关闭标签页后自动清除。
 
 ## 📦 部署到生产环境
 
@@ -167,7 +184,7 @@
    # 将代码推送到GitHub
    git add .
    git commit -m "Initial commit"
-   git push origin main
+   git push origin master
    ```
 
 2. **Vercel部署步骤**
@@ -180,6 +197,7 @@
      APP_SECRET=你的飞书应用密钥
      APP_TOKEN=你的多维表格Token
      TABLE_ID=你的表格ID
+     ADMIN_TOKEN=至少32位随机管理员令牌
      ```
      ![环境变量配置](./doc/images/env.png)
    - 点击"Deploy"开始部署
@@ -221,6 +239,7 @@
    ```bash
    # 访问API接口测试
    # 在浏览器中访问：http://localhost:3000/api/navigation
+   # 配置与降级状态：http://localhost:3000/api/health
    ```
 
 **常见错误码及解决方案**：
@@ -260,7 +279,7 @@ localStorage.clear();
 遇到问题时的求助渠道：
 
 1. **查看文档**：先查看本README和`doc/`目录下的详细文档
-2. **问题反馈**：[GitHub Issues](https://github.com/wubh2012/navsite/issues)
+2. **问题反馈**：[GitHub Issues](https://github.com/zhttttttty/navsite/issues)
 3. **功能建议**：通过Issues提交功能需求
 4. **紧急问题**：可以通过邮件联系维护者
 
@@ -273,7 +292,30 @@ localStorage.clear();
 
 ## 📅 更新日志
 
-### v1.2.0 (当前版本)
+### v1.5.0 (当前版本)
+
+- ✅ **工作台布局**：参考 FlatNas 的信息层级，增加站点摘要、紧凑时间栏和分组玻璃面板
+- ✅ **卡片层级**：按网站生成稳定的品牌色光晕，分类区与站点卡片更容易快速扫读
+- ✅ **图标多源抓取**：DuckDuckGo 与 Google 双来源回退，并增加服务端限量内存缓存
+- ✅ **添加预览**：显示匹配域名、抓取状态和多源标识，失败时继续使用稳定文字图标
+
+### v1.4.0
+
+- ✅ **导航布局**：按分类分区显示，调整卡片密度、时钟层级和响应式间距
+- ✅ **搜索体验**：支持网站、分类和域名即时筛选，并可选择网络搜索引擎
+- ✅ **图标可靠性**：64px favicon、失败状态识别、确定性文字图标及手动重新抓取
+- ✅ **管理模式**：删除和图标刷新操作集中到显式管理状态
+- ✅ **PWA体验**：安装提示延迟到回访，并保留七天内不重复打扰的规则
+
+### v1.3.0
+
+- ✅ **安全加固**：管理员令牌保护写接口，动态内容使用安全DOM渲染
+- ✅ **凭证保护**：日志不再输出飞书密钥或完整请求对象
+- ✅ **数据可靠性**：支持飞书分页并对不完整字段容错
+- ✅ **PWA修复**：真实尺寸PNG图标、有效清单及一致的离线接口
+- ✅ **工程质量**：Node自动化测试、依赖审计、GitHub Actions和Dependabot
+
+### v1.2.0
 
 - ✅ **PWA 支持**：完整的 Progressive Web App 功能
   - 离线访问支持，断网状态下仍可使用

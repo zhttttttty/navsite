@@ -9,36 +9,36 @@ const SKIN_THEMES = {
     icon: 'bi-stars',
     colors: {
       light: {
-        primary: '#FF0066',
+        primary: '#C6004F',
         secondary: '#4500FF',
         accent: '#0006FF',
         accentGreen: '#00FFAA',
         warning: '#FF8800',
-        danger: '#FF4D4F',
-        neonPink: '#FF0066',
+        danger: '#B4232F',
+        neonPink: '#C6004F',
         neonCyan: '#00F6FF',
         neonPurple: '#4500FF',
         textHigh: '#FFFFFF',
         textMid: '#8B86BD',
         textLow: '#5E55E7',
-        primaryBg: 'linear-gradient(135deg, #050012, #0D0122, #1a0033)',
+        primaryBg: '#080016',
         glassBg: 'rgba(255, 255, 255, 0.8)',
         elevatedBg: 'rgba(13, 1, 34, 0.8)'
       },
       dark: {
-        primary: '#FF0066',
+        primary: '#C6004F',
         secondary: '#4500FF',
         accent: '#0006FF',
         accentGreen: '#00FFAA',
         warning: '#FF8800',
-        danger: '#FF4D4F',
-        neonPink: '#FF0066',
+        danger: '#B4232F',
+        neonPink: '#C6004F',
         neonCyan: '#00F6FF',
         neonPurple: '#4500FF',
         textHigh: '#FFFFFF',
         textMid: '#8B86BD',
         textLow: '#5E55E7',
-        primaryBg: 'linear-gradient(135deg, #050012, #0D0122, #1a0033)',
+        primaryBg: '#080016',
         glassBg: 'rgba(13, 1, 34, 0.6)',
         elevatedBg: 'rgba(13, 1, 34, 0.8)'
       }
@@ -256,9 +256,16 @@ class ThemeManager {
   }
 
   init() {
+    const skinSelector = document.getElementById('skin-selector');
+    if (skinSelector && skinSelector.parentElement !== document.body) {
+      document.body.appendChild(skinSelector);
+    }
+
     this.loadUserPreferences();
     this.applyTheme();
     this.bindEvents();
+    this.updateSkinSelector();
+    this.updateModeToggle();
     this.isInitialized = true;
     
     // 设置全局标志，表示主题已初始化
@@ -366,8 +373,8 @@ class ThemeManager {
       root.style.setProperty('--time-color', colors.textHigh);
       root.style.setProperty('--date-color', colors.textMid);
       root.style.setProperty('--tool-item-bg', colors.glassBg);
-      root.style.setProperty('--tool-item-shadow', `0 2px 12px rgba(${this.hexToRgb(colors.primary)}, 0.2)`);
-      root.style.setProperty('--tool-item-hover-shadow', `0 0 20px rgba(${this.hexToRgb(colors.neonPink)}, 0.5)`);
+      root.style.setProperty('--tool-item-shadow', '0 6px 16px rgba(0, 0, 0, 0.2)');
+      root.style.setProperty('--tool-item-hover-shadow', '0 12px 26px rgba(0, 0, 0, 0.28)');
       root.style.setProperty('--tool-icon-color', colors.textHigh);
       root.style.setProperty('--tool-name-color', colors.textHigh);
     } else {
@@ -425,6 +432,12 @@ class ThemeManager {
     if (currentSkinIcon) {
       currentSkinIcon.className = `bi ${SKIN_THEMES[this.currentSkin].icon}`;
     }
+
+    const currentSkinButton = document.querySelector('.current-skin');
+    if (currentSkinButton) {
+      currentSkinButton.setAttribute('aria-label', `当前主题：${SKIN_THEMES[this.currentSkin].name}，点击选择主题`);
+      currentSkinButton.title = `页面主题：${SKIN_THEMES[this.currentSkin].name}`;
+    }
     
     // 更新皮肤选项的选中状态
     document.querySelectorAll('.skin-option').forEach(option => {
@@ -442,10 +455,12 @@ class ThemeManager {
         if (icon) {
           if (this.currentMode === 'dark') {
             icon.className = 'bi bi-sun';
-            themeToggleBtn.title = '';
+            themeToggleBtn.title = '切换到亮色模式';
+            themeToggleBtn.setAttribute('aria-label', '切换到亮色模式');
           } else {
             icon.className = 'bi bi-moon';
-            themeToggleBtn.title = '';
+            themeToggleBtn.title = '切换到暗色模式';
+            themeToggleBtn.setAttribute('aria-label', '切换到暗色模式');
           }
         }
       }
@@ -469,8 +484,8 @@ class ThemeManager {
   bindEvents() {
     // 皮肤选择器展开/收起事件
     document.addEventListener('click', (e) => {
-      // 点击展开按钮或皮肤文字都可以弹出选择页面
-      if (e.target.closest('.skin-expand-btn') || e.target.closest('.current-skin-name')) {
+      // 点击当前主题按钮弹出选择面板
+      if (e.target.closest('.current-skin')) {
         this.toggleSkinSelector();
       }
       
@@ -496,6 +511,10 @@ class ThemeManager {
     const skinSelector = document.querySelector('.skin-selector');
     if (skinSelector) {
       skinSelector.classList.toggle('expanded');
+      const currentSkinButton = skinSelector.querySelector('.current-skin');
+      if (currentSkinButton) {
+        currentSkinButton.setAttribute('aria-expanded', String(skinSelector.classList.contains('expanded')));
+      }
       
       // 更新展开按钮的图标
       const expandBtn = skinSelector.querySelector('.skin-expand-btn i');
@@ -513,6 +532,8 @@ class ThemeManager {
     const skinSelector = document.querySelector('.skin-selector');
     if (skinSelector && skinSelector.classList.contains('expanded')) {
       skinSelector.classList.remove('expanded');
+      const currentSkinButton = skinSelector.querySelector('.current-skin');
+      if (currentSkinButton) currentSkinButton.setAttribute('aria-expanded', 'false');
       
       // 更新展开按钮的图标
       const expandBtn = skinSelector.querySelector('.skin-expand-btn i');
