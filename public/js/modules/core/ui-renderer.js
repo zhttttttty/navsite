@@ -64,6 +64,19 @@ class UIRenderer {
       });
       this.categoryMenu.appendChild(li);
     });
+
+    this.updateDashboardSummary();
+  }
+
+  updateDashboardSummary() {
+    const { navigationData, categories } = this.dataManager.getCurrentData();
+    const siteCount = categories.reduce((total, category) => {
+      return total + (Array.isArray(navigationData[category]) ? navigationData[category].length : 0);
+    }, 0);
+    const siteCountElement = document.getElementById('site-count');
+    const categoryCountElement = document.getElementById('category-count');
+    if (siteCountElement) siteCountElement.textContent = String(siteCount);
+    if (categoryCountElement) categoryCountElement.textContent = String(categories.length);
   }
 
   // 显示工具
@@ -222,10 +235,7 @@ class UIRenderer {
     // 检查当前主题模式
     const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    const normalizedName = String(name || '?');
-    const hue = [...normalizedName].reduce((hash, character) => {
-      return ((hash * 31) + character.codePointAt(0)) % 360;
-    }, 17);
+    const hue = this.getDeterministicHue(name);
     // 在亮色模式下使用更浅的背景色（亮度从80%提高到90%）
     const lightness = isDarkMode ? 80 : 90;
     const bgColor = `hsl(${hue}, 70%, ${lightness}%)`;
@@ -239,11 +249,18 @@ class UIRenderer {
     return textIcon;
   }
 
+  getDeterministicHue(value) {
+    return [...String(value || '?')].reduce((hash, character) => {
+      return ((hash * 31) + character.codePointAt(0)) % 360;
+    }, 17);
+  }
+
   // 添加工具项
   addToolItem(tool, target = this.toolsGrid) {
     const toolItem = document.createElement('div');
     toolItem.className = 'tool-item glass-container hover-lift click-bounce';
     toolItem.dataset.id = tool.id || '';
+    toolItem.style.setProperty('--tool-hue', String(this.getDeterministicHue(tool?.url || tool?.name)));
 
     // 创建链接元素
     const linkElement = document.createElement('a');

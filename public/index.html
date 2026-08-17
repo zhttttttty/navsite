@@ -175,7 +175,12 @@
     <!-- 主内容区 -->
     <main class="main-content">
       <!-- 顶部信息区 -->
-      <header class="top-info">
+      <header class="top-info dashboard-header">
+        <div class="workspace-intro">
+          <span class="workspace-kicker"><i class="bi bi-grid-1x2" aria-hidden="true"></i> 个人工作台</span>
+          <h1>水果导航</h1>
+          <p><strong id="site-count">--</strong> 个站点 <span aria-hidden="true">·</span> <strong id="category-count">--</strong> 个分类</p>
+        </div>
         <div class="time-info">
           <div class="current-time" id="current-time">--:--:--</div>
           <div class="date-info" id="date-info">加载中...</div>
@@ -236,8 +241,12 @@
                 <span id="favicon-preview-fallback" aria-hidden="true">?</span>
               </span>
               <span class="favicon-preview-copy">
-                <strong>网站图标预览</strong>
+                <span class="favicon-preview-title">
+                  <strong>自动匹配图标</strong>
+                  <span>多源抓取</span>
+                </span>
                 <small id="favicon-preview-status">正在识别图标…</small>
+                <small id="favicon-preview-domain" class="favicon-preview-domain"></small>
               </span>
               <button id="refresh-favicon-btn" type="button">重新抓取</button>
             </div>

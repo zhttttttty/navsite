@@ -3,6 +3,7 @@ const { after, before, test } = require('node:test');
 
 const app = require('../server');
 const {
+  fetchFavicon,
   getBitableData,
   parseHttpUrl,
   processTableData
@@ -95,6 +96,37 @@ test('URL parser rejects executable and data protocols', () => {
   assert.equal(parseHttpUrl('javascript:alert(1)'), null);
   assert.equal(parseHttpUrl('data:text/html,test'), null);
   assert.equal(parseHttpUrl('https://example.com/path').hostname, 'example.com');
+});
+
+test('favicon fetching falls back between providers and reuses its memory cache', async () => {
+  const image = Buffer.alloc(128, 1);
+  const calls = [];
+  const client = {
+    async get(url) {
+      calls.push(url);
+      if (url.includes('duckduckgo.com')) throw new Error('primary unavailable');
+      return { data: image, headers: { 'content-type': 'image/png' } };
+    }
+  };
+
+  const first = await fetchFavicon('fallback-test.example', 64, client);
+  const second = await fetchFavicon('fallback-test.example', 64, client);
+
+  assert.equal(first.data, image);
+  assert.equal(second.data, image);
+  assert.equal(calls.length, 2);
+  assert.match(calls[0], /duckduckgo\.com/);
+  assert.match(calls[1], /google\.com/);
+});
+
+test('favicon fetching rejects invalid provider responses', async () => {
+  const client = {
+    async get() {
+      return { data: Buffer.from('not an image'), headers: { 'content-type': 'text/plain' } };
+    }
+  };
+
+  await assert.rejects(() => fetchFavicon('invalid-test.example', 64, client), /无效图片/);
 });
 
 test('table processing tolerates incomplete fields and prototype-like categories', () => {

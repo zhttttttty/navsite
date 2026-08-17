@@ -127,7 +127,8 @@ class LinkManager {
     const image = document.getElementById('favicon-preview-image');
     const fallback = document.getElementById('favicon-preview-fallback');
     const status = document.getElementById('favicon-preview-status');
-    if (!input || !preview || !image || !fallback || !status) return;
+    const domain = document.getElementById('favicon-preview-domain');
+    if (!input || !preview || !image || !fallback || !status || !domain) return;
 
     let parsedUrl;
     try {
@@ -141,6 +142,7 @@ class LinkManager {
     }
 
     preview.hidden = false;
+    domain.textContent = parsedUrl.hostname.replace(/^www\./, '');
     fallback.textContent = (parsedUrl.hostname.replace(/^www\./, '')[0] || '?').toUpperCase();
     fallback.style.display = 'none';
     image.style.display = 'block';
@@ -160,7 +162,7 @@ class LinkManager {
       if (image.naturalWidth <= 1 || image.naturalHeight <= 1) {
         showFallback();
       } else {
-        status.textContent = '已自动获取，可稍后在管理模式重新抓取';
+        status.textContent = '已自动获取并缓存，可在管理模式重新抓取';
       }
     };
     image.onerror = showFallback;

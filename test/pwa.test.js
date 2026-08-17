@@ -71,7 +71,9 @@ test('favicon rendering has a stable, visible fallback and local UI icon assets'
   );
   const index = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
 
-  assert.match(server, /&sz=\$\{faviconSize\}/);
+  assert.match(server, /icons\.duckduckgo\.com/);
+  assert.match(server, /&sz=\$\{size\}/);
+  assert.match(server, /const faviconCache = new Map\(\)/);
   assert.match(server, /status\(404\)\.json/);
   assert.doesNotMatch(server, /transparent.*1x1/i);
   assert.doesNotMatch(renderer, /Math\.random\(\)/);
@@ -92,7 +94,10 @@ test('homepage exposes search, grouped navigation and explicit management mode',
   assert.match(index, /id="site-search-input"/);
   assert.match(index, /id="manage-links-btn"/);
   assert.match(index, /id="favicon-preview"/);
+  assert.match(index, /id="site-count"/);
+  assert.match(index, /id="favicon-preview-domain"/);
   assert.match(renderer, /className = 'category-section'/);
+  assert.match(renderer, /--tool-hue/);
   assert.match(renderer, /setSearchQuery\(value\)/);
   assert.match(app, /classList\.toggle\('edit-mode'\)/);
 });

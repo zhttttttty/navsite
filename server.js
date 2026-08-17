@@ -55,6 +55,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // 缓存tenant_access_token及其过期时间
 let cachedToken = null;
 let tokenExpireTime = null;
+const faviconCache = new Map();
+const FAVICON_CACHE_TTL = 24 * 60 * 60 * 1000;
+const FAVICON_CACHE_LIMIT = 250;
 
 function getConfigurationStatus() {
   const missingFeishu = FEISHU_ENV_KEYS.filter(key => !process.env[key]);
@@ -111,6 +114,49 @@ function parseHttpUrl(value) {
   } catch (error) {
     return null;
   }
+}
+
+async function fetchFavicon(hostname, size, client = axios, forceRefresh = false) {
+  const cacheKey = `${hostname}:${size}`;
+  const cached = faviconCache.get(cacheKey);
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+    return cached;
+  }
+
+  const providers = [
+    `https://icons.duckduckgo.com/ip3/${encodeURIComponent(hostname)}.ico`,
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=${size}`
+  ];
+  let lastError;
+
+  for (const providerUrl of providers) {
+    try {
+      const response = await client.get(providerUrl, {
+        responseType: 'arraybuffer',
+        timeout: 5000,
+        maxContentLength: 1024 * 1024
+      });
+      const contentType = response.headers?.['content-type'] || '';
+      if (!contentType.startsWith('image/') || !response.data || response.data.length < 100) {
+        throw new Error('图标服务返回了无效图片');
+      }
+
+      const result = {
+        data: response.data,
+        contentType,
+        expiresAt: Date.now() + FAVICON_CACHE_TTL
+      };
+      if (faviconCache.size >= FAVICON_CACHE_LIMIT) {
+        faviconCache.delete(faviconCache.keys().next().value);
+      }
+      faviconCache.set(cacheKey, result);
+      return result;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('未找到可用的网站图标');
 }
 
 function normalizeText(value, maxLength) {
@@ -391,25 +437,11 @@ app.get('/api/favicon', async (req, res) => {
     
     const requestedSize = Number.parseInt(req.query.size, 10);
     const faviconSize = [32, 64, 128].includes(requestedSize) ? requestedSize : 64;
-    const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(parsedUrl.hostname)}&sz=${faviconSize}`;
-    
-    // 代理请求到Google favicon服务
-    const response = await axios.get(faviconUrl, {
-      responseType: 'arraybuffer',
-      timeout: 5000,
-      maxContentLength: 1024 * 1024
-    });
-    
-    const contentType = response.headers['content-type'] || '';
-    if (!contentType.startsWith('image/') || response.data.length < 100) {
-      throw new Error('favicon服务返回了无效图片');
-    }
+    const favicon = await fetchFavicon(parsedUrl.hostname, faviconSize, axios, Boolean(req.query.refresh));
 
-    res.set('Content-Type', contentType);
+    res.set('Content-Type', favicon.contentType);
     res.set('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
-    
-    // 返回图片数据
-    res.send(response.data);
+    res.send(favicon.data);
     
   } catch (error) {
     console.error('Favicon代理错误:', error.message);
@@ -615,6 +647,7 @@ if (require.main === module) {
 module.exports = app;
 module.exports._test = {
   constantTimeEqual,
+  fetchFavicon,
   getBitableData,
   getConfigurationStatus,
   parseHttpUrl,
