@@ -256,10 +256,8 @@ class ThemeManager {
   }
 
   init() {
-    const skinSelector = document.getElementById('skin-selector');
-    if (skinSelector && skinSelector.parentElement !== document.body) {
-      document.body.appendChild(skinSelector);
-    }
+    this.syncSkinSelectorLocation();
+    window.addEventListener('resize', () => this.syncSkinSelectorLocation());
 
     this.loadUserPreferences();
     this.applyTheme();
@@ -270,6 +268,24 @@ class ThemeManager {
     
     // 设置全局标志，表示主题已初始化
     window.themeInitialized = true;
+  }
+
+  syncSkinSelectorLocation() {
+    const skinSelector = document.getElementById('skin-selector');
+    const mobileActions = document.querySelector('.mobile-actions');
+    const mobileThemeToggle = document.getElementById('theme-toggle-btn');
+    const headerActions = document.querySelector('.header-actions');
+    const desktopThemeToggle = document.getElementById('desktop-theme-toggle-btn');
+    if (!skinSelector) return;
+
+    if (window.matchMedia('(max-width: 768px)').matches && mobileActions) {
+      mobileActions.insertBefore(skinSelector, mobileThemeToggle);
+      return;
+    }
+
+    if (headerActions) {
+      headerActions.insertBefore(skinSelector, desktopThemeToggle);
+    }
   }
 
   loadUserPreferences() {
