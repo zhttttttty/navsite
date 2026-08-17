@@ -32,8 +32,8 @@ app.use((req, res, next) => {
     'Content-Security-Policy': [
       "default-src 'self'",
       "script-src 'self'",
-      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
-      "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https:",
       "connect-src 'self'",
       "object-src 'none'",
@@ -281,28 +281,28 @@ function processTableData(items) {
 // 模拟数据（当无法连接飞书API时使用）
 const mockData = {
   'Code': [
-    { id: 'mock_001', name: 'GitHub', url: 'https://github.com', category: 'Code', sort: 1, icon: 'bi-github' },
-    { id: 'mock_002', name: 'Stack Overflow', url: 'https://stackoverflow.com', category: 'Code', sort: 2, icon: 'bi-stack-overflow' },
-    { id: 'mock_003', name: 'VSCode', url: 'https://code.visualstudio.com', category: 'Code', sort: 3, icon: 'bi-code-square' },
-    { id: 'mock_004', name: 'CodePen', url: 'https://codepen.io', category: 'Code', sort: 4, icon: 'bi-code-slash' }
+    { id: 'mock_001', name: 'GitHub', url: 'https://github.com', category: 'Code', sort: 1, icon: '' },
+    { id: 'mock_002', name: 'Stack Overflow', url: 'https://stackoverflow.com', category: 'Code', sort: 2, icon: '' },
+    { id: 'mock_003', name: 'VSCode', url: 'https://code.visualstudio.com', category: 'Code', sort: 3, icon: '' },
+    { id: 'mock_004', name: 'CodePen', url: 'https://codepen.io', category: 'Code', sort: 4, icon: '' }
   ],
   '设计': [
-    { id: 'mock_005', name: 'Figma', url: 'https://figma.com', category: '设计', sort: 1, icon: 'bi-palette' },
-    { id: 'mock_006', name: 'Dribbble', url: 'https://dribbble.com', category: '设计', sort: 2, icon: 'bi-dribbble' },
-    { id: 'mock_007', name: 'Behance', url: 'https://behance.net', category: '设计', sort: 3, icon: 'bi-brush' },
-    { id: 'mock_008', name: 'Unsplash', url: 'https://unsplash.com', category: '设计', sort: 4, icon: 'bi-image' }
+    { id: 'mock_005', name: 'Figma', url: 'https://figma.com', category: '设计', sort: 1, icon: '' },
+    { id: 'mock_006', name: 'Dribbble', url: 'https://dribbble.com', category: '设计', sort: 2, icon: '' },
+    { id: 'mock_007', name: 'Behance', url: 'https://behance.net', category: '设计', sort: 3, icon: '' },
+    { id: 'mock_008', name: 'Unsplash', url: 'https://unsplash.com', category: '设计', sort: 4, icon: '' }
   ],
   '产品': [
-    { id: 'mock_009', name: 'ProductHunt', url: 'https://producthunt.com', category: '产品', sort: 1, icon: 'bi-graph-up' },
-    { id: 'mock_010', name: 'Trello', url: 'https://trello.com', category: '产品', sort: 2, icon: 'bi-kanban' },
-    { id: 'mock_011', name: 'Notion', url: 'https://notion.so', category: '产品', sort: 3, icon: 'bi-journal-text' },
-    { id: 'mock_012', name: 'Asana', url: 'https://asana.com', category: '产品', sort: 4, icon: 'bi-list-check' }
+    { id: 'mock_009', name: 'ProductHunt', url: 'https://producthunt.com', category: '产品', sort: 1, icon: '' },
+    { id: 'mock_010', name: 'Trello', url: 'https://trello.com', category: '产品', sort: 2, icon: '' },
+    { id: 'mock_011', name: 'Notion', url: 'https://notion.so', category: '产品', sort: 3, icon: '' },
+    { id: 'mock_012', name: 'Asana', url: 'https://asana.com', category: '产品', sort: 4, icon: '' }
   ],
   '其它': [
-    { id: 'mock_013', name: '百度', url: 'https://baidu.com', category: '其它', sort: 1, icon: 'bi-search' },
-    { id: 'mock_014', name: '微博', url: 'https://weibo.com', category: '其它', sort: 2, icon: 'bi-chat-dots' },
-    { id: 'mock_015', name: '知乎', url: 'https://zhihu.com', category: '其它', sort: 3, icon: 'bi-question-circle' },
-    { id: 'mock_016', name: 'B站', url: 'https://bilibili.com', category: '其它', sort: 4, icon: 'bi-play-btn' }
+    { id: 'mock_013', name: '百度', url: 'https://baidu.com', category: '其它', sort: 1, icon: '' },
+    { id: 'mock_014', name: '微博', url: 'https://weibo.com', category: '其它', sort: 2, icon: '' },
+    { id: 'mock_015', name: '知乎', url: 'https://zhihu.com', category: '其它', sort: 3, icon: '' },
+    { id: 'mock_016', name: 'B站', url: 'https://bilibili.com', category: '其它', sort: 4, icon: '' }
   ]
 };
 
@@ -389,8 +389,9 @@ app.get('/api/favicon', async (req, res) => {
       });
     }
     
-    // 尝试获取网站的favicon
-    const faviconUrl = `https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&size=32`;
+    const requestedSize = Number.parseInt(req.query.size, 10);
+    const faviconSize = [32, 64, 128].includes(requestedSize) ? requestedSize : 64;
+    const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(parsedUrl.hostname)}&sz=${faviconSize}`;
     
     // 代理请求到Google favicon服务
     const response = await axios.get(faviconUrl, {
@@ -399,9 +400,13 @@ app.get('/api/favicon', async (req, res) => {
       maxContentLength: 1024 * 1024
     });
     
-    // 设置正确的Content-Type
-    res.set('Content-Type', response.headers['content-type']);
-    res.set('Cache-Control', 'public, max-age=86400'); // 缓存24小时
+    const contentType = response.headers['content-type'] || '';
+    if (!contentType.startsWith('image/') || response.data.length < 100) {
+      throw new Error('favicon服务返回了无效图片');
+    }
+
+    res.set('Content-Type', contentType);
+    res.set('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
     
     // 返回图片数据
     res.send(response.data);
@@ -409,11 +414,12 @@ app.get('/api/favicon', async (req, res) => {
   } catch (error) {
     console.error('Favicon代理错误:', error.message);
     
-    // 返回一个透明的1x1像素图片作为fallback
-    const fallbackImage = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
-    res.set('Content-Type', 'image/png');
-    res.set('Cache-Control', 'public, max-age=300'); // 缓存5分钟
-    res.send(fallbackImage);
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=3600');
+    res.status(404).json({
+      success: false,
+      code: 'FAVICON_NOT_FOUND',
+      message: '未找到可用的网站图标'
+    });
   }
 });
 

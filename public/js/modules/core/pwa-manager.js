@@ -4,7 +4,23 @@
 class PWAManager {
   constructor() {
     this.deferredPrompt = null;
+    this.visitCount = this.recordVisit();
     this.init();
+  }
+
+  recordVisit() {
+    const previous = Number.parseInt(localStorage.getItem('navsite-visit-count'), 10) || 0;
+    if (sessionStorage.getItem('navsite-visit-recorded') === 'true') return previous;
+    const current = Math.min(previous + 1, 10);
+    localStorage.setItem('navsite-visit-count', String(current));
+    sessionStorage.setItem('navsite-visit-recorded', 'true');
+    return current;
+  }
+
+  shouldShowInstallPrompt() {
+    const lastDismissed = Number.parseInt(localStorage.getItem('pwa-install-dismissed'), 10) || 0;
+    const dismissedRecently = Date.now() - lastDismissed < 7 * 24 * 60 * 60 * 1000;
+    return this.visitCount >= 2 && !dismissedRecently;
   }
 
   async init() {
@@ -55,7 +71,7 @@ class PWAManager {
       console.log('[PWA] 安装提示事件触发');
       e.preventDefault();
       this.deferredPrompt = e;
-      this.showInstallPrompt();
+      if (this.shouldShowInstallPrompt()) this.showInstallPrompt();
     });
 
     // PWA 安装成功
@@ -143,7 +159,7 @@ class PWAManager {
 
   // 显示安装提示
   showInstallPrompt() {
-    if (!this.deferredPrompt) return;
+    if (!this.deferredPrompt || !this.shouldShowInstallPrompt()) return;
 
     const prompt = document.createElement('div');
     prompt.className = 'pwa-install-prompt';
@@ -262,12 +278,6 @@ class PWAManager {
       localStorage.setItem('pwa-install-dismissed', Date.now());
     });
 
-    // 检查是否最近被拒绝过
-    const lastDismissed = localStorage.getItem('pwa-install-dismissed');
-    if (lastDismissed && (Date.now() - parseInt(lastDismissed)) < 7 * 24 * 60 * 60 * 1000) {
-      prompt.remove();
-      return;
-    }
   }
 
   // 显示安装成功消息

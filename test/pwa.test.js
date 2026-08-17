@@ -62,3 +62,48 @@ test('navigation records are rendered without interpolating external text into H
   assert.match(renderer, /nameElement\.textContent = name/);
   assert.match(linkManager, /text\.textContent = message/);
 });
+
+test('favicon rendering has a stable, visible fallback and local UI icon assets', () => {
+  const server = fs.readFileSync(path.join(projectRoot, 'server.js'), 'utf8');
+  const renderer = fs.readFileSync(
+    path.join(projectRoot, 'public', 'js', 'modules', 'core', 'ui-renderer.js'),
+    'utf8'
+  );
+  const index = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
+
+  assert.match(server, /&sz=\$\{faviconSize\}/);
+  assert.match(server, /status\(404\)\.json/);
+  assert.doesNotMatch(server, /transparent.*1x1/i);
+  assert.doesNotMatch(renderer, /Math\.random\(\)/);
+  assert.match(renderer, /naturalWidth <= 1/);
+  assert.match(renderer, /faviconProxyUrl\.searchParams\.set\('size', '64'\)/);
+  assert.match(index, /\/vendor\/bootstrap-icons\/bootstrap-icons\.min\.css/);
+  assert.doesNotMatch(index, /cdn\.jsdelivr\.net\/npm\/bootstrap-icons/);
+});
+
+test('homepage exposes search, grouped navigation and explicit management mode', () => {
+  const index = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
+  const renderer = fs.readFileSync(
+    path.join(projectRoot, 'public', 'js', 'modules', 'core', 'ui-renderer.js'),
+    'utf8'
+  );
+  const app = fs.readFileSync(path.join(projectRoot, 'public', 'js', 'app.js'), 'utf8');
+
+  assert.match(index, /id="site-search-input"/);
+  assert.match(index, /id="manage-links-btn"/);
+  assert.match(index, /id="favicon-preview"/);
+  assert.match(renderer, /className = 'category-section'/);
+  assert.match(renderer, /setSearchQuery\(value\)/);
+  assert.match(app, /classList\.toggle\('edit-mode'\)/);
+});
+
+test('install prompt waits until a return visit and respects dismissal', () => {
+  const pwaManager = fs.readFileSync(
+    path.join(projectRoot, 'public', 'js', 'modules', 'core', 'pwa-manager.js'),
+    'utf8'
+  );
+
+  assert.match(pwaManager, /this\.visitCount >= 2/);
+  assert.match(pwaManager, /pwa-install-dismissed/);
+  assert.match(pwaManager, /7 \* 24 \* 60 \* 60 \* 1000/);
+});

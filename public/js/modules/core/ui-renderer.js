@@ -5,6 +5,7 @@ class UIRenderer {
   constructor(dataManager) {
     this.dataManager = dataManager;
     this.currentCategory = 'all';
+    this.searchQuery = '';
     this.faviconCache = new Map();
 
     // DOM元素引用
@@ -49,7 +50,12 @@ class UIRenderer {
       li.appendChild(document.createTextNode(` ${category}`));
       li.setAttribute('role', 'button');
       li.tabIndex = 0;
-      li.addEventListener('click', () => this.showTools(category));
+      li.addEventListener('click', () => {
+        this.showTools(category);
+        if (window.innerWidth <= 768 && window.interactionManager) {
+          window.interactionManager.closeMobileMenu();
+        }
+      });
       li.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
@@ -78,27 +84,76 @@ class UIRenderer {
       }
     });
 
-    // 清空工具网格
+    this.renderTools();
+  }
+
+  setSearchQuery(value) {
+    this.searchQuery = typeof value === 'string' ? value.trim().toLocaleLowerCase() : '';
+    this.renderTools();
+  }
+
+  toolMatchesSearch(tool, category) {
+    if (!this.searchQuery) return true;
+    const searchable = [tool?.name, tool?.url, category]
+      .filter(value => typeof value === 'string')
+      .join(' ')
+      .toLocaleLowerCase();
+    return searchable.includes(this.searchQuery);
+  }
+
+  renderTools() {
+    if (!this.toolsGrid) return;
+
     this.toolsGrid.innerHTML = '';
-
+    this.toolsGrid.classList.toggle('grouped-view', this.currentCategory === 'all');
     const { navigationData, categories } = this.dataManager.getCurrentData();
+    let visibleCount = 0;
 
-    // 显示所有分类或特定分类的工具
-    if (category === 'all') {
-      // 显示所有分类的工具
-      categories.forEach(cat => {
-        const tools = navigationData[cat] || [];
-        tools.forEach(tool => this.addToolItem(tool));
+    if (this.currentCategory === 'all') {
+      categories.forEach(category => {
+        const tools = (navigationData[category] || [])
+          .filter(tool => this.toolMatchesSearch(tool, category));
+        if (!tools.length) return;
+
+        const section = document.createElement('section');
+        section.className = 'category-section';
+        const heading = document.createElement('div');
+        heading.className = 'category-heading';
+        const title = document.createElement('h2');
+        title.textContent = category;
+        const count = document.createElement('span');
+        count.textContent = String(tools.length);
+        count.setAttribute('aria-label', `${tools.length} 个网站`);
+        heading.append(title, count);
+
+        const grid = document.createElement('div');
+        grid.className = 'category-tools-grid';
+        tools.forEach(tool => this.addToolItem(tool, grid));
+        visibleCount += tools.length;
+        section.append(heading, grid);
+        this.toolsGrid.appendChild(section);
       });
     } else {
-      // 显示特定分类的工具
-      const tools = navigationData[category] || [];
-      tools.forEach(tool => this.addToolItem(tool));
+      const tools = (navigationData[this.currentCategory] || [])
+        .filter(tool => this.toolMatchesSearch(tool, this.currentCategory));
+      tools.forEach(tool => this.addToolItem(tool, this.toolsGrid));
+      visibleCount = tools.length;
+    }
+
+    if (!visibleCount) {
+      const emptyState = document.createElement('div');
+      emptyState.className = 'empty-state';
+      const title = document.createElement('strong');
+      title.textContent = this.searchQuery ? '没有找到匹配的网站' : '这个分类还没有网站';
+      const hint = document.createElement('span');
+      hint.textContent = this.searchQuery ? '换个关键词，或使用右侧按钮搜索网络' : '点击右下角按钮添加第一个网站';
+      emptyState.append(title, hint);
+      this.toolsGrid.appendChild(emptyState);
     }
   }
 
   // 获取网站favicon的URL
-  getFaviconUrl(url) {
+  getFaviconUrl(url, refresh = false) {
     try {
       const safeUrl = this.getSafeUrl(url);
       if (!safeUrl) return null;
@@ -107,47 +162,19 @@ class UIRenderer {
       const hostname = urlObj.hostname;
 
       // 检查内存缓存
-      const cacheKey = `favicon_${hostname}`;
-      if (this.faviconCache.has(cacheKey)) {
+      const cacheKey = `favicon_v2_${hostname}`;
+      if (!refresh && this.faviconCache.has(cacheKey)) {
         return this.faviconCache.get(cacheKey);
-      }
-
-      // 检查LocalStorage缓存
-      try {
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-          const cacheData = JSON.parse(cached);
-          // 检查缓存是否过期（24小时）
-          if (Date.now() - cacheData.timestamp < 24 * 60 * 60 * 1000) {
-            this.faviconCache.set(cacheKey, cacheData.url);
-            return cacheData.url;
-          }
-        }
-      } catch (e) {
-        // 静默处理LocalStorage错误
       }
 
       // 通过同源代理获取favicon，避免浏览器直接向第三方暴露访问列表
       const faviconProxyUrl = new URL('/api/favicon', window.location.origin);
       faviconProxyUrl.searchParams.set('url', safeUrl);
+      faviconProxyUrl.searchParams.set('size', '64');
+      if (refresh) faviconProxyUrl.searchParams.set('refresh', String(Date.now()));
       const faviconUrl = `${faviconProxyUrl.pathname}${faviconProxyUrl.search}`;
 
-      // 预缓存到内存（使用Google服务）
       this.faviconCache.set(cacheKey, faviconUrl);
-
-      // 异步缓存到LocalStorage（不阻塞主线程）
-      setTimeout(() => {
-        try {
-          localStorage.setItem(cacheKey, JSON.stringify({
-            url: faviconUrl,
-            timestamp: Date.now(),
-            ttl: 24 * 60 * 60 * 1000 // 24小时
-          }));
-        } catch (e) {
-          // 静默处理LocalStorage错误
-        }
-      }, 0);
-
       return faviconUrl;
 
     } catch (e) {
@@ -195,8 +222,10 @@ class UIRenderer {
     // 检查当前主题模式
     const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
 
-    // 生成随机背景色（柔和的颜色）
-    const hue = Math.floor(Math.random() * 360);
+    const normalizedName = String(name || '?');
+    const hue = [...normalizedName].reduce((hash, character) => {
+      return ((hash * 31) + character.codePointAt(0)) % 360;
+    }, 17);
     // 在亮色模式下使用更浅的背景色（亮度从80%提高到90%）
     const lightness = isDarkMode ? 80 : 90;
     const bgColor = `hsl(${hue}, 70%, ${lightness}%)`;
@@ -211,7 +240,7 @@ class UIRenderer {
   }
 
   // 添加工具项
-  addToolItem(tool) {
+  addToolItem(tool, target = this.toolsGrid) {
     const toolItem = document.createElement('div');
     toolItem.className = 'tool-item glass-container hover-lift click-bounce';
     toolItem.dataset.id = tool.id || '';
@@ -243,10 +272,6 @@ class UIRenderer {
         primaryIcon.src = safeIconUrl;
         primaryIcon.alt = '';
         primaryIcon.className = 'tool-icon';
-      } else if (/^bi-[a-z0-9-]+$/.test(tool.icon.trim())) {
-        primaryIcon = document.createElement('i');
-        primaryIcon.className = `bi ${tool.icon.trim()} tool-icon`;
-        primaryIcon.setAttribute('aria-hidden', 'true');
       }
     }
 
@@ -261,18 +286,33 @@ class UIRenderer {
       }
     }
 
+    const iconShell = document.createElement('span');
+    iconShell.className = 'tool-icon-shell';
     if (primaryIcon) {
       fallbackIcon.style.display = 'none';
       if (primaryIcon.tagName === 'IMG') {
-        primaryIcon.addEventListener('error', () => {
+        primaryIcon.loading = 'lazy';
+        primaryIcon.decoding = 'async';
+        primaryIcon.referrerPolicy = 'no-referrer';
+        const showFallback = () => {
           primaryIcon.style.display = 'none';
           fallbackIcon.style.display = 'flex';
+          iconShell.classList.add('is-fallback');
+        };
+        primaryIcon.addEventListener('error', showFallback);
+        primaryIcon.addEventListener('load', () => {
+          if (primaryIcon.naturalWidth <= 1 || primaryIcon.naturalHeight <= 1) {
+            showFallback();
+          } else {
+            iconShell.classList.add('is-ready');
+          }
         });
       }
-      linkElement.appendChild(primaryIcon);
+      iconShell.appendChild(primaryIcon);
     }
 
-    linkElement.appendChild(fallbackIcon);
+    iconShell.appendChild(fallbackIcon);
+    linkElement.appendChild(iconShell);
     const nameElement = document.createElement('div');
     nameElement.className = 'tool-name';
     nameElement.textContent = name;
@@ -281,10 +321,7 @@ class UIRenderer {
     // 添加删除按钮
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'tool-item-delete-btn';
-    const deleteIcon = document.createElement('i');
-    deleteIcon.className = 'bi bi-trash';
-    deleteIcon.setAttribute('aria-hidden', 'true');
-    deleteBtn.appendChild(deleteIcon);
+    deleteBtn.textContent = '×';
     deleteBtn.title = '删除网站';
     deleteBtn.setAttribute('aria-label', `删除网站 ${name}`);
     deleteBtn.dataset.toolId = tool.id || '';
@@ -299,11 +336,28 @@ class UIRenderer {
       }
     });
 
-    // 组装工具项
+    const refreshBtn = document.createElement('button');
+    refreshBtn.className = 'tool-item-refresh-btn';
+    refreshBtn.textContent = '↻';
+    refreshBtn.title = '重新抓取图标';
+    refreshBtn.setAttribute('aria-label', `重新抓取 ${name} 的图标`);
+    refreshBtn.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const image = iconShell.querySelector('img');
+      const refreshedUrl = this.getFaviconUrl(tool.url, true);
+      if (!image || !refreshedUrl) return;
+      fallbackIcon.style.display = 'none';
+      image.style.display = 'block';
+      iconShell.classList.remove('is-fallback', 'is-ready');
+      image.src = refreshedUrl;
+    });
+
     toolItem.appendChild(linkElement);
+    toolItem.appendChild(refreshBtn);
     toolItem.appendChild(deleteBtn);
 
-    this.toolsGrid.appendChild(toolItem);
+    target.appendChild(toolItem);
   }
 
   // 显示加载动画

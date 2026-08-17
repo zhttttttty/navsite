@@ -5,6 +5,7 @@ class LinkManager {
   constructor(dataManager) {
     this.dataManager = dataManager;
     this.isAddLinkEventsBound = false;
+    this.faviconPreviewTimer = null;
     this.init();
   }
 
@@ -90,6 +91,7 @@ class LinkManager {
         } else {
           this.clearFieldError('url');
         }
+        this.scheduleFaviconPreview();
       });
       
       // 网址自动补全和提取域名的事件监听器
@@ -104,8 +106,65 @@ class LinkManager {
       siteUrlInput.addEventListener('blur', () => {
         this.autoCompleteUrl();
         this.extractDomainForSiteName();
+        this.scheduleFaviconPreview(0);
       });
     }
+
+    const refreshFaviconBtn = document.getElementById('refresh-favicon-btn');
+    if (refreshFaviconBtn) {
+      refreshFaviconBtn.addEventListener('click', () => this.updateFaviconPreview(true));
+    }
+  }
+
+  scheduleFaviconPreview(delay = 450) {
+    clearTimeout(this.faviconPreviewTimer);
+    this.faviconPreviewTimer = setTimeout(() => this.updateFaviconPreview(), delay);
+  }
+
+  updateFaviconPreview(forceRefresh = false) {
+    const input = document.getElementById('site-url');
+    const preview = document.getElementById('favicon-preview');
+    const image = document.getElementById('favicon-preview-image');
+    const fallback = document.getElementById('favicon-preview-fallback');
+    const status = document.getElementById('favicon-preview-status');
+    if (!input || !preview || !image || !fallback || !status) return;
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(input.value.trim());
+      if (!['http:', 'https:'].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) {
+        throw new Error('unsupported URL');
+      }
+    } catch (error) {
+      preview.hidden = true;
+      return;
+    }
+
+    preview.hidden = false;
+    fallback.textContent = (parsedUrl.hostname.replace(/^www\./, '')[0] || '?').toUpperCase();
+    fallback.style.display = 'none';
+    image.style.display = 'block';
+    status.textContent = '正在识别图标…';
+
+    const faviconUrl = new URL('/api/favicon', window.location.origin);
+    faviconUrl.searchParams.set('url', parsedUrl.href);
+    faviconUrl.searchParams.set('size', '64');
+    if (forceRefresh) faviconUrl.searchParams.set('refresh', String(Date.now()));
+
+    const showFallback = () => {
+      image.style.display = 'none';
+      fallback.style.display = 'flex';
+      status.textContent = '未找到图标，将使用文字标识';
+    };
+    image.onload = () => {
+      if (image.naturalWidth <= 1 || image.naturalHeight <= 1) {
+        showFallback();
+      } else {
+        status.textContent = '已自动获取，可稍后在管理模式重新抓取';
+      }
+    };
+    image.onerror = showFallback;
+    image.src = `${faviconUrl.pathname}${faviconUrl.search}`;
   }
 
   // 填充分类下拉菜单
@@ -160,6 +219,8 @@ class LinkManager {
     // 清空表单
     addLinkForm.reset();
     this.clearErrors();
+    const faviconPreview = document.getElementById('favicon-preview');
+    if (faviconPreview) faviconPreview.hidden = true;
 
     // 控制自定义分类输入框的显示/隐藏
     const categorySelect = document.getElementById('site-category');

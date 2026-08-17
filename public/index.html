@@ -44,7 +44,7 @@
 
   <!-- Stylesheets -->
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.min.css">
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap"
     rel="stylesheet">
@@ -182,6 +182,23 @@
         </div>
       </header>
 
+      <section class="search-panel" aria-label="搜索">
+        <div class="site-search">
+          <span class="search-symbol" aria-hidden="true">⌕</span>
+          <input id="site-search-input" type="search" autocomplete="off" placeholder="搜索网站、分类或域名" aria-label="搜索导航网站">
+          <kbd>Ctrl K</kbd>
+        </div>
+        <div class="search-actions">
+          <select id="search-engine" aria-label="选择网络搜索引擎">
+            <option value="bing">必应</option>
+            <option value="baidu">百度</option>
+            <option value="google">Google</option>
+          </select>
+          <button id="web-search-btn" type="button">搜索网络</button>
+          <button id="manage-links-btn" class="manage-links-btn" type="button" aria-pressed="false">管理</button>
+        </div>
+      </section>
+
       <!-- 添加链接按钮 -->
       <button id="add-link-btn" class="add-link-btn" aria-label="添加网站">
         <i class="bi bi-plus"></i>
@@ -213,6 +230,17 @@
             <label for="site-url">网站网址 *</label>
             <input type="url" id="site-url" name="site-url" value="https://" placeholder="请输入完整网址，包含http://或https://">
             <div class="error-message" id="url-error"></div>
+            <div id="favicon-preview" class="favicon-preview" hidden>
+              <span class="favicon-preview-icon">
+                <img id="favicon-preview-image" alt="">
+                <span id="favicon-preview-fallback" aria-hidden="true">?</span>
+              </span>
+              <span class="favicon-preview-copy">
+                <strong>网站图标预览</strong>
+                <small id="favicon-preview-status">正在识别图标…</small>
+              </span>
+              <button id="refresh-favicon-btn" type="button">重新抓取</button>
+            </div>
           </div>
           <div class="form-group">
             <label for="site-name">网站名称 *</label>

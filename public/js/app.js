@@ -58,6 +58,7 @@ async function initApp() {
     
     // 初始化交互管理器
     interactionManager = new window.InteractionManager();
+    window.interactionManager = interactionManager;
     
     // 获取并显示数据
     await loadAndDisplayData();
@@ -154,7 +155,10 @@ function bindEventListeners() {
   // 主页菜单项点击事件
   const homeMenuItem = document.querySelector('[data-category="all"]');
   if (homeMenuItem) {
-    homeMenuItem.addEventListener('click', () => uiRenderer.showTools('all'));
+    homeMenuItem.addEventListener('click', () => {
+      uiRenderer.showTools('all');
+      if (window.innerWidth <= 768) interactionManager.closeMobileMenu();
+    });
     homeMenuItem.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
@@ -167,6 +171,65 @@ function bindEventListeners() {
   window.addEventListener('dataChanged', async () => {
     console.log('数据发生变更，重新加载...');
     await loadAndDisplayData();
+  });
+
+  bindSearchControls();
+  bindManageMode();
+}
+
+function bindSearchControls() {
+  const input = document.getElementById('site-search-input');
+  const engineSelect = document.getElementById('search-engine');
+  const webSearchButton = document.getElementById('web-search-btn');
+  if (!input || !engineSelect || !webSearchButton) return;
+
+  const savedEngine = localStorage.getItem('navsite_search_engine');
+  if (['bing', 'baidu', 'google'].includes(savedEngine)) {
+    engineSelect.value = savedEngine;
+  }
+
+  const searchUrls = {
+    bing: 'https://www.bing.com/search?q=',
+    baidu: 'https://www.baidu.com/s?wd=',
+    google: 'https://www.google.com/search?q='
+  };
+
+  const searchWeb = () => {
+    const query = input.value.trim();
+    if (!query) {
+      input.focus();
+      return;
+    }
+    const searchUrl = searchUrls[engineSelect.value] || searchUrls.bing;
+    window.open(`${searchUrl}${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  input.addEventListener('input', () => uiRenderer.setSearchQuery(input.value));
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && event.ctrlKey) searchWeb();
+  });
+  engineSelect.addEventListener('change', () => {
+    localStorage.setItem('navsite_search_engine', engineSelect.value);
+  });
+  webSearchButton.addEventListener('click', searchWeb);
+
+  document.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === 'k') {
+      event.preventDefault();
+      input.focus();
+      input.select();
+    }
+  });
+}
+
+function bindManageMode() {
+  const button = document.getElementById('manage-links-btn');
+  if (!button) return;
+
+  button.addEventListener('click', () => {
+    const enabled = document.body.classList.toggle('edit-mode');
+    button.setAttribute('aria-pressed', String(enabled));
+    button.textContent = enabled ? '完成' : '管理';
   });
 }
 
