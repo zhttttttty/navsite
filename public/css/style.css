@@ -3942,9 +3942,10 @@ body::after {
 }
 
 .search-capsule {
+  width: min(100%, 980px);
   min-width: 0;
   height: 54px;
-  flex: 1;
+  flex: 0 1 980px;
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -3977,8 +3978,8 @@ body::after {
 }
 
 .search-capsule > select {
-  width: 96px;
-  padding: 0 30px 0 16px;
+  width: 118px;
+  padding: 0 34px 0 16px;
   border-right: 1px solid var(--border-glass);
 }
 
@@ -4245,8 +4246,8 @@ body[data-view-mode="compact"] .tool-open-indicator {
   }
 
   .search-capsule > select {
-    width: 82px;
-    padding-inline: 11px 25px;
+    width: 112px;
+    padding-inline: 11px 28px;
   }
 
   .search-capsule .site-search {

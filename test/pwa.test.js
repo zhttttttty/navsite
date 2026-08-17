@@ -119,6 +119,9 @@ test('homepage uses the modern local visual system without external fonts', () =
   assert.match(index, /class="search-capsule"/);
   assert.match(index, /class="search-actions search-secondary-actions"/);
   assert.match(css, /v1\.7：现代深空视觉系统/);
+  assert.match(css, /width: min\(100%, 980px\)/);
+  assert.match(css, /\.search-capsule > select \{[\s\S]*?width: 118px/);
+  assert.match(css, /@media \(max-width: 768px\)[\s\S]*?\.search-capsule > select \{[\s\S]*?width: 112px/);
   assert.match(css, /\.tool-domain/);
   assert.match(renderer, /getDisplayHostname/);
   assert.match(renderer, /tool-open-indicator/);
