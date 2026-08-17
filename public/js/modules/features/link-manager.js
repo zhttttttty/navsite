@@ -556,20 +556,22 @@ class LinkManager {
     // 添加样式
     Object.assign(messageElement.style, {
       position: 'fixed',
-      top: '20px',
-      right: '20px',
+      top: '80px',
+      right: 'max(16px, env(safe-area-inset-right))',
       backgroundColor: '#52c41a',
       color: 'white',
       padding: '12px 20px',
       borderRadius: '8px',
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-      zIndex: '1004',
+      zIndex: '1200',
       display: 'flex',
       alignItems: 'center',
       gap: '8px',
       fontSize: '14px',
       animation: 'fadeInSlideIn 0.3s ease',
-      maxWidth: '300px'
+      maxWidth: 'min(360px, calc(100vw - 32px))',
+      lineHeight: '1.5',
+      overflowWrap: 'anywhere'
     });
 
     // 添加动画样式
@@ -631,20 +633,22 @@ class LinkManager {
     // 添加样式
     Object.assign(messageElement.style, {
       position: 'fixed',
-      top: '20px',
-      right: '20px',
+      top: '80px',
+      right: 'max(16px, env(safe-area-inset-right))',
       backgroundColor: '#ff4d4f',
       color: 'white',
       padding: '12px 20px',
       borderRadius: '8px',
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-      zIndex: '1004',
+      zIndex: '1200',
       display: 'flex',
       alignItems: 'center',
       gap: '8px',
       fontSize: '14px',
       animation: 'fadeInSlideIn 0.3s ease',
-      maxWidth: '300px'
+      maxWidth: 'min(360px, calc(100vw - 32px))',
+      lineHeight: '1.5',
+      overflowWrap: 'anywhere'
     });
 
     // 添加动画样式（如果还没有添加）

@@ -9,6 +9,7 @@ const { Lunar } = require('lunar-javascript');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const FEISHU_ENV_KEYS = ['APP_ID', 'APP_SECRET', 'APP_TOKEN', 'TABLE_ID'];
+const ADMIN_TOKEN_MIN_LENGTH = 6;
 const adminWriteLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 30,
@@ -63,7 +64,8 @@ function getConfigurationStatus() {
   const missingFeishu = FEISHU_ENV_KEYS.filter(key => !process.env[key]);
   return {
     feishuConfigured: missingFeishu.length === 0,
-    adminConfigured: typeof process.env.ADMIN_TOKEN === 'string' && process.env.ADMIN_TOKEN.length >= 32,
+    adminConfigured: typeof process.env.ADMIN_TOKEN === 'string'
+      && process.env.ADMIN_TOKEN.length >= ADMIN_TOKEN_MIN_LENGTH,
     missingFeishu
   };
 }
@@ -84,7 +86,7 @@ function constantTimeEqual(left, right) {
 
 function requireAdmin(req, res, next) {
   const configuredToken = process.env.ADMIN_TOKEN;
-  if (typeof configuredToken !== 'string' || configuredToken.length < 32) {
+  if (typeof configuredToken !== 'string' || configuredToken.length < ADMIN_TOKEN_MIN_LENGTH) {
     return res.status(503).json({
       success: false,
       code: 'ADMIN_NOT_CONFIGURED',

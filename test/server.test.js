@@ -58,8 +58,18 @@ test('write endpoints fail closed when admin token is not configured', async () 
   assert.equal(body.code, 'ADMIN_NOT_CONFIGURED');
 });
 
+test('admin token must contain at least six characters', async () => {
+  process.env.ADMIN_TOKEN = '12345';
+  const { response, body } = await request('/api/links/example', {
+    method: 'DELETE',
+    headers: { authorization: 'Bearer 12345' }
+  });
+  assert.equal(response.status, 503);
+  assert.equal(body.code, 'ADMIN_NOT_CONFIGURED');
+});
+
 test('write endpoints reject an invalid admin token', async () => {
-  process.env.ADMIN_TOKEN = 'correct-token-with-at-least-32-chars';
+  process.env.ADMIN_TOKEN = 'Ab12x9';
   const { response, body } = await request('/api/links/example', {
     method: 'DELETE',
     headers: { authorization: 'Bearer wrong-token' }
@@ -69,11 +79,11 @@ test('write endpoints reject an invalid admin token', async () => {
 });
 
 test('link creation only accepts HTTP and HTTPS URLs', async () => {
-  process.env.ADMIN_TOKEN = 'correct-token-with-at-least-32-chars';
+  process.env.ADMIN_TOKEN = 'Ab12x9';
   const { response, body } = await request('/api/links', {
     method: 'POST',
     headers: {
-      authorization: 'Bearer correct-token-with-at-least-32-chars',
+      authorization: 'Bearer Ab12x9',
       'content-type': 'application/json'
     },
     body: JSON.stringify({ name: 'Unsafe', url: 'javascript:alert(1)', category: 'Test' })
@@ -83,10 +93,10 @@ test('link creation only accepts HTTP and HTTPS URLs', async () => {
 });
 
 test('link deletion validates record IDs before calling Feishu', async () => {
-  process.env.ADMIN_TOKEN = 'correct-token-with-at-least-32-chars';
+  process.env.ADMIN_TOKEN = 'Ab12x9';
   const { response, body } = await request('/api/links/bad%20id', {
     method: 'DELETE',
-    headers: { authorization: 'Bearer correct-token-with-at-least-32-chars' }
+    headers: { authorization: 'Bearer Ab12x9' }
   });
   assert.equal(response.status, 400);
   assert.match(body.message, /记录ID/);

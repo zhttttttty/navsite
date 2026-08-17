@@ -146,7 +146,7 @@
      APP_TOKEN=你的多维表格Token
      TABLE_ID=你的表格ID
 
-     # 保护添加和删除接口，建议使用至少32位随机值
+     # 保护添加和删除接口，至少6位，建议混合字母和数字
      ADMIN_TOKEN=你的管理员令牌
      
      # 服务器端口
@@ -197,7 +197,7 @@
      APP_SECRET=你的飞书应用密钥
      APP_TOKEN=你的多维表格Token
      TABLE_ID=你的表格ID
-     ADMIN_TOKEN=至少32位随机管理员令牌
+     ADMIN_TOKEN=至少6位管理员令牌
      ```
      ![环境变量配置](./doc/images/env.png)
    - 点击"Deploy"开始部署
