@@ -18,8 +18,8 @@
   <meta name="description" content="基于飞书多维表格的个人网站导航工具，支持分类管理、搜索功能、暗黑模式等特性">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="msapplication-config" content="browserconfig.xml">
-  <meta name="msapplication-TileColor" content="#ff0066">
-  <meta name="theme-color" content="#ff0066">
+  <meta name="msapplication-TileColor" content="#0b0f17">
+  <meta name="theme-color" content="#4f46e5">
 
   <!-- Icons for various devices -->
   <link rel="icon" type="image/x-icon" href="img/logo.ico">
@@ -45,9 +45,6 @@
   <!-- Stylesheets -->
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.min.css">
-  <link
-    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap"
-    rel="stylesheet">
 </head>
 
 <body>
@@ -100,7 +97,7 @@
             <div class="current-skin-preview">
               <i class="bi bi-stars current-skin-icon" aria-hidden="true"></i>
             </div>
-            <span class="current-skin-name">霓虹风格</span>
+            <span class="current-skin-name">深空灰</span>
             <span class="skin-expand-btn" aria-hidden="true">
               <i class="bi bi-chevron-down"></i>
             </span>
@@ -114,7 +111,7 @@
                   <div class="color-dot secondary"></div>
                   <div class="color-dot accent"></div>
                 </div>
-                <span class="skin-label">霓虹风格</span>
+                <span class="skin-label">深空灰</span>
               </div>
 
               <div class="skin-option" data-skin="ocean">
@@ -182,20 +179,25 @@
       </header>
 
       <section class="search-panel" aria-label="搜索">
-        <div class="site-search">
-          <i class="bi bi-search search-symbol" aria-hidden="true"></i>
-          <input id="site-search-input" type="search" autocomplete="off" placeholder="搜索网站、分类或域名" aria-label="搜索导航网站">
-          <kbd>Ctrl K /</kbd>
-        </div>
-        <div class="search-actions">
-          <select id="search-engine" aria-label="选择网络搜索引擎">
+        <div class="search-capsule">
+          <select id="search-engine" aria-label="选择网络搜索引擎" title="选择网络搜索引擎">
             <option value="bing">必应</option>
             <option value="baidu">百度</option>
             <option value="google">Google</option>
             <option value="github">GitHub</option>
             <option value="bilibili">Bilibili</option>
           </select>
-          <button id="web-search-btn" type="button">搜索网络</button>
+          <div class="site-search">
+            <i class="bi bi-search search-symbol" aria-hidden="true"></i>
+            <input id="site-search-input" type="search" autocomplete="off" placeholder="搜索网站、分类或域名" aria-label="搜索导航网站">
+            <kbd>Ctrl K</kbd>
+          </div>
+          <button id="web-search-btn" type="button" title="使用所选引擎搜索">
+            <i class="bi bi-arrow-up-right" aria-hidden="true"></i>
+            <span>搜索</span>
+          </button>
+        </div>
+        <div class="search-actions search-secondary-actions">
           <button id="view-mode-toggle" class="view-mode-toggle" type="button" aria-pressed="false" title="切换到紧凑视图">
             <i class="bi bi-grid" aria-hidden="true"></i>
             <span>紧凑</span>

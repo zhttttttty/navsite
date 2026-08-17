@@ -348,6 +348,17 @@ class UIRenderer {
     }, 17);
   }
 
+  getDisplayHostname(value) {
+    const safeUrl = this.getSafeUrl(value);
+    if (!safeUrl) return '';
+
+    try {
+      return new URL(safeUrl).hostname.replace(/^www\./, '');
+    } catch {
+      return '';
+    }
+  }
+
   // 添加工具项
   addToolItem(tool, target = this.toolsGrid, category = '') {
     const toolItem = document.createElement('div');
@@ -426,10 +437,26 @@ class UIRenderer {
 
     iconShell.appendChild(fallbackIcon);
     linkElement.appendChild(iconShell);
+
+    const copyElement = document.createElement('span');
+    copyElement.className = 'tool-copy';
     const nameElement = document.createElement('div');
     nameElement.className = 'tool-name';
     nameElement.textContent = name;
-    linkElement.appendChild(nameElement);
+    copyElement.appendChild(nameElement);
+
+    const hostname = this.getDisplayHostname(tool?.url);
+    if (hostname) {
+      const domainElement = document.createElement('span');
+      domainElement.className = 'tool-domain';
+      domainElement.textContent = hostname;
+      copyElement.appendChild(domainElement);
+    }
+
+    const openIndicator = document.createElement('i');
+    openIndicator.className = 'bi bi-arrow-up-right tool-open-indicator';
+    openIndicator.setAttribute('aria-hidden', 'true');
+    linkElement.append(copyElement, openIndicator);
 
     let pinBtn = null;
     if (this.personalizationManager) {

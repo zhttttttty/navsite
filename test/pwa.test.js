@@ -102,6 +102,30 @@ test('homepage exposes search, grouped navigation and explicit management mode',
   assert.match(app, /classList\.toggle\('edit-mode'\)/);
 });
 
+test('homepage uses the modern local visual system without external fonts', () => {
+  const index = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(projectRoot, 'public', 'css', 'style.css'), 'utf8');
+  const renderer = fs.readFileSync(
+    path.join(projectRoot, 'public', 'js', 'modules', 'core', 'ui-renderer.js'),
+    'utf8'
+  );
+  const themeManager = fs.readFileSync(
+    path.join(projectRoot, 'public', 'js', 'modules', 'core', 'theme-manager.js'),
+    'utf8'
+  );
+
+  assert.doesNotMatch(index, /fonts\.googleapis\.com|Orbitron/);
+  assert.doesNotMatch(css, /font-family:\s*["']Orbitron/);
+  assert.match(index, /class="search-capsule"/);
+  assert.match(index, /class="search-actions search-secondary-actions"/);
+  assert.match(css, /v1\.7：现代深空视觉系统/);
+  assert.match(css, /\.tool-domain/);
+  assert.match(renderer, /getDisplayHostname/);
+  assert.match(renderer, /tool-open-indicator/);
+  assert.match(themeManager, /name: '深空灰'/);
+  assert.match(themeManager, /primaryBg: '#0B0F17'/);
+});
+
 test('command palette supports local pinyin matching and keyboard navigation', () => {
   const index = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
   const palette = fs.readFileSync(
