@@ -3533,6 +3533,14 @@ input {
   box-shadow: none;
 }
 
+.user-avatar img.is-random-avatar,
+.mobile-logo img.is-random-avatar {
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.82;
+  filter: saturate(0.72);
+}
+
 .user-avatar:hover img {
   opacity: 0.78;
   filter: saturate(0.85);
@@ -3550,6 +3558,7 @@ input {
 .mobile-logo img {
   width: 26px;
   height: 26px;
+  border-radius: 50%;
   filter: saturate(0.65);
 }
 
@@ -3861,6 +3870,16 @@ body::after {
   height: 44px;
   opacity: 0.34;
   filter: grayscale(0.3) saturate(0.5);
+}
+
+.user-avatar img.is-random-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.82;
+  filter: saturate(0.72);
 }
 
 .nav-menu {

@@ -59,6 +59,9 @@ let tokenExpireTime = null;
 const faviconCache = new Map();
 const FAVICON_CACHE_TTL = 24 * 60 * 60 * 1000;
 const FAVICON_CACHE_LIMIT = 250;
+const NAVIGATION_AVATAR_URL = 'https://t.alcy.cc/ycy/';
+const NAVIGATION_AVATAR_CACHE_TTL = 30 * 60 * 1000;
+let navigationAvatarCache = null;
 
 function getConfigurationStatus() {
   const missingFeishu = FEISHU_ENV_KEYS.filter(key => !process.env[key]);
@@ -159,6 +162,27 @@ async function fetchFavicon(hostname, size, client = axios, forceRefresh = false
   }
 
   throw lastError || new Error('未找到可用的网站图标');
+}
+
+async function fetchNavigationAvatar(client = axios) {
+  if (navigationAvatarCache?.expiresAt > Date.now()) return navigationAvatarCache;
+
+  const response = await client.get(NAVIGATION_AVATAR_URL, {
+    responseType: 'arraybuffer',
+    timeout: 10000,
+    maxContentLength: 5 * 1024 * 1024
+  });
+  const contentType = response.headers?.['content-type'] || '';
+  if (!contentType.startsWith('image/') || !response.data || response.data.length < 100) {
+    throw new Error('随机图片服务返回了无效内容');
+  }
+
+  navigationAvatarCache = {
+    data: response.data,
+    contentType,
+    expiresAt: Date.now() + NAVIGATION_AVATAR_CACHE_TTL
+  };
+  return navigationAvatarCache;
 }
 
 function normalizeText(value, maxLength) {
@@ -457,6 +481,23 @@ app.get('/api/favicon', async (req, res) => {
   }
 });
 
+app.get('/api/navigation-avatar', async (req, res) => {
+  try {
+    const avatar = await fetchNavigationAvatar();
+    res.set('Content-Type', avatar.contentType);
+    res.set('Cache-Control', 'public, max-age=1800, s-maxage=1800, stale-while-revalidate=86400');
+    res.send(avatar.data);
+  } catch (error) {
+    console.error('随机导航图片代理错误:', error.message);
+    res.set('Cache-Control', 'no-store');
+    res.status(502).json({
+      success: false,
+      code: 'NAVIGATION_AVATAR_UNAVAILABLE',
+      message: '随机导航图片暂时不可用'
+    });
+  }
+});
+
 // 主页路由
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -647,6 +688,7 @@ module.exports = app;
 module.exports._test = {
   constantTimeEqual,
   fetchFavicon,
+  fetchNavigationAvatar,
   getBitableData,
   getConfigurationStatus,
   parseHttpUrl,

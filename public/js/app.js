@@ -45,6 +45,23 @@ let interactionManager = null;
 let personalizationManager = null;
 let commandPalette = null;
 
+function bindNavigationAvatarFallbacks() {
+  document.querySelectorAll('[data-navigation-avatar]').forEach(avatar => {
+    const showFallback = () => {
+      const fallbackSrc = avatar.dataset.fallbackSrc;
+      avatar.classList.remove('is-random-avatar');
+      if (fallbackSrc && avatar.getAttribute('src') !== fallbackSrc) {
+        avatar.src = fallbackSrc;
+      }
+    };
+
+    avatar.addEventListener('error', showFallback, { once: true });
+    if (avatar.complete && avatar.naturalWidth === 0) showFallback();
+  });
+}
+
+bindNavigationAvatarFallbacks();
+
 // 初始化应用程序
 async function initApp() {
   try {
