@@ -70,9 +70,6 @@ async function initApp() {
     setTimeout(() => {
       window.utils.hidePageLoader();
       
-      // 初始化皮肤选择器
-      window.utils.initSkinSelector();
-      
       // 确保图标背景色正确设置
       if (window.themeInitialized) {
         window.utils.refreshToolIcons();

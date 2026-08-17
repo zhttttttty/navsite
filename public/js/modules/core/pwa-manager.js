@@ -3,31 +3,13 @@
  */
 class PWAManager {
   constructor() {
-    this.deferredPrompt = null;
-    this.visitCount = this.recordVisit();
     this.init();
-  }
-
-  recordVisit() {
-    const previous = Number.parseInt(localStorage.getItem('navsite-visit-count'), 10) || 0;
-    if (sessionStorage.getItem('navsite-visit-recorded') === 'true') return previous;
-    const current = Math.min(previous + 1, 10);
-    localStorage.setItem('navsite-visit-count', String(current));
-    sessionStorage.setItem('navsite-visit-recorded', 'true');
-    return current;
-  }
-
-  shouldShowInstallPrompt() {
-    const lastDismissed = Number.parseInt(localStorage.getItem('pwa-install-dismissed'), 10) || 0;
-    const dismissedRecently = Date.now() - lastDismissed < 7 * 24 * 60 * 60 * 1000;
-    return this.visitCount >= 2 && !dismissedRecently;
   }
 
   async init() {
     if ('serviceWorker' in navigator) {
       await this.registerServiceWorker();
     }
-    this.bindInstallEvents();
   }
 
   // Service Worker 注册
@@ -62,24 +44,6 @@ class PWAManager {
     } catch (error) {
       console.error('[PWA] Service Worker 注册失败:', error);
     }
-  }
-
-  // 绑定安装事件
-  bindInstallEvents() {
-    // PWA 安装提示
-    window.addEventListener('beforeinstallprompt', (e) => {
-      console.log('[PWA] 安装提示事件触发');
-      e.preventDefault();
-      this.deferredPrompt = e;
-      if (this.shouldShowInstallPrompt()) this.showInstallPrompt();
-    });
-
-    // PWA 安装成功
-    window.addEventListener('appinstalled', () => {
-      console.log('[PWA] PWA 安装成功');
-      this.showInstallSuccessMessage();
-      this.deferredPrompt = null;
-    });
   }
 
   // 显示更新通知

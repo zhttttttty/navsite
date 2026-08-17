@@ -3176,6 +3176,70 @@ input {
   display: none;
 }
 
+/* 右上角外观控制：主题皮肤与明暗模式并列 */
+#skin-selector {
+  position: fixed;
+  top: 20px;
+  right: 76px;
+  width: 48px;
+  margin: 0;
+  z-index: 1100;
+  overflow: visible;
+  border-color: var(--border-glass);
+  border-radius: 14px;
+  background: var(--sidebar-bg);
+}
+
+#skin-selector .current-skin {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  justify-content: center;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text-color);
+  font: inherit;
+}
+
+#skin-selector .current-skin-preview {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+#skin-selector .current-skin-name,
+#skin-selector .skin-expand-btn,
+#skin-selector .skin-mode-toggle {
+  display: none;
+}
+
+#skin-selector .skin-options {
+  top: calc(100% + 8px);
+  right: 0;
+  bottom: auto;
+  left: auto;
+  width: 300px;
+  border-radius: 14px;
+  background: var(--sidebar-bg);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+  transform: translateY(-6px);
+}
+
+#skin-selector.expanded .skin-options {
+  transform: translateY(0);
+}
+
+#skin-selector .skin-grid {
+  max-height: none;
+}
+
+.dashboard-header .time-info {
+  margin-right: 112px;
+}
+
 @media (max-width: 768px) {
   .main-content {
     padding: 14px 14px 88px;
@@ -3195,6 +3259,29 @@ input {
   .sidebar .user-avatar img {
     width: 44px;
     height: 44px;
+  }
+
+  #skin-selector {
+    top: 6px;
+    right: 68px;
+    width: 44px;
+    border-color: var(--border-glass);
+    border-radius: 12px;
+  }
+
+  #skin-selector .current-skin {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+
+  #skin-selector .skin-options {
+    right: -56px;
+    width: min(300px, calc(100vw - 24px));
+  }
+
+  .dashboard-header .time-info {
+    margin-right: 0;
   }
 
   .current-time {

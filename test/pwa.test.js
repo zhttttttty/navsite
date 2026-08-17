@@ -102,13 +102,12 @@ test('homepage exposes search, grouped navigation and explicit management mode',
   assert.match(app, /classList\.toggle\('edit-mode'\)/);
 });
 
-test('install prompt waits until a return visit and respects dismissal', () => {
+test('PWA manager leaves installation UI to the browser', () => {
   const pwaManager = fs.readFileSync(
     path.join(projectRoot, 'public', 'js', 'modules', 'core', 'pwa-manager.js'),
     'utf8'
   );
 
-  assert.match(pwaManager, /this\.visitCount >= 2/);
-  assert.match(pwaManager, /pwa-install-dismissed/);
-  assert.match(pwaManager, /7 \* 24 \* 60 \* 60 \* 1000/);
+  assert.doesNotMatch(pwaManager, /beforeinstallprompt/);
+  assert.doesNotMatch(pwaManager, /bindInstallEvents/);
 });

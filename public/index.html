@@ -96,15 +96,15 @@
 
         <!-- 皮肤选择器 -->
         <div class="skin-selector" id="skin-selector">
-          <div class="current-skin">
+          <button type="button" class="current-skin" aria-label="选择页面主题">
             <div class="current-skin-preview">
-              <i class="bi bi-stars current-skin-icon"></i>
+              <i class="bi bi-stars current-skin-icon" aria-hidden="true"></i>
             </div>
             <span class="current-skin-name">霓虹风格</span>
-            <button class="skin-expand-btn" aria-label="展开皮肤选择器">
+            <span class="skin-expand-btn" aria-hidden="true">
               <i class="bi bi-chevron-down"></i>
-            </button>
-          </div>
+            </span>
+          </button>
 
           <div class="skin-options">
             <div class="skin-grid">
@@ -163,10 +163,6 @@
               </div>
             </div>
 
-            <div class="skin-mode-toggle">
-              <i class="bi bi-moon"></i>
-              <span>暗黑模式</span>
-            </div>
           </div>
         </div>
       </nav>

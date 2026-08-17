@@ -1,6 +1,6 @@
 // Service Worker for 水果导航 PWA
-const STATIC_CACHE_NAME = 'fruit-nav-static-v1.5.2';
-const API_CACHE_NAME = 'fruit-nav-api-v1.5.2';
+const STATIC_CACHE_NAME = 'fruit-nav-static-v1.5.3';
+const API_CACHE_NAME = 'fruit-nav-api-v1.5.3';
 
 // 需要缓存的静态资源
 const STATIC_ASSETS = [
