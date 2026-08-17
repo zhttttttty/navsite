@@ -1,16 +1,53 @@
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const axios = require('axios');
-const moment = require('moment');
+const { rateLimit } = require('express-rate-limit');
 const { Lunar } = require('lunar-javascript');
-moment.locale('zh-cn');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const FEISHU_ENV_KEYS = ['APP_ID', 'APP_SECRET', 'APP_TOKEN', 'TABLE_ID'];
+const adminWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    code: 'RATE_LIMITED',
+    message: '管理员操作过于频繁，请稍后重试'
+  }
+});
 
-// 解析JSON请求体
-app.use(express.json());
+app.disable('x-powered-by');
+
+// 解析JSON请求体并限制匿名请求的内存占用
+app.use(express.json({ limit: '16kb' }));
+
+// 基础安全响应头。当前页面使用内联样式，因此仅对样式保留 unsafe-inline。
+app.use((req, res, next) => {
+  res.set({
+    'Content-Security-Policy': [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+      "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com",
+      "img-src 'self' data: https:",
+      "connect-src 'self'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "frame-ancestors 'none'",
+      "form-action 'self'"
+    ].join('; '),
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+  });
+  next();
+});
 
 // 静态文件服务
 app.use(express.static(path.join(__dirname, 'public')));
@@ -18,6 +55,67 @@ app.use(express.static(path.join(__dirname, 'public')));
 // 缓存tenant_access_token及其过期时间
 let cachedToken = null;
 let tokenExpireTime = null;
+
+function getConfigurationStatus() {
+  const missingFeishu = FEISHU_ENV_KEYS.filter(key => !process.env[key]);
+  return {
+    feishuConfigured: missingFeishu.length === 0,
+    adminConfigured: typeof process.env.ADMIN_TOKEN === 'string' && process.env.ADMIN_TOKEN.length >= 32,
+    missingFeishu
+  };
+}
+
+function getSafeExternalError(error) {
+  return {
+    status: error?.response?.status,
+    code: error?.response?.data?.code,
+    message: error?.response?.data?.msg || error?.code || error?.message
+  };
+}
+
+function constantTimeEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left || ''));
+  const rightBuffer = Buffer.from(String(right || ''));
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function requireAdmin(req, res, next) {
+  const configuredToken = process.env.ADMIN_TOKEN;
+  if (typeof configuredToken !== 'string' || configuredToken.length < 32) {
+    return res.status(503).json({
+      success: false,
+      code: 'ADMIN_NOT_CONFIGURED',
+      message: '管理员功能尚未配置'
+    });
+  }
+
+  const authorization = req.get('authorization') || '';
+  const providedToken = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  if (!constantTimeEqual(providedToken, configuredToken)) {
+    return res.status(401).json({
+      success: false,
+      code: 'UNAUTHORIZED',
+      message: '管理员令牌无效或已过期'
+    });
+  }
+
+  next();
+}
+
+function parseHttpUrl(value) {
+  if (typeof value !== 'string' || value.length > 2048) return null;
+  try {
+    const parsed = new URL(value.trim());
+    const supportedProtocol = ['http:', 'https:'].includes(parsed.protocol);
+    return supportedProtocol && !parsed.username && !parsed.password ? parsed : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function normalizeText(value, maxLength) {
+  return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+}
 
 // 获取tenant_access_token
 async function getTenantAccessToken() {
@@ -29,7 +127,12 @@ async function getTenantAccessToken() {
   }
 
   try {
-    console.log('重新获取tenant_access_token', process.env.APP_ID, process.env.APP_SECRET);
+    const configuration = getConfigurationStatus();
+    if (!configuration.feishuConfigured) {
+      throw new Error(`飞书配置缺失: ${configuration.missingFeishu.join(', ')}`);
+    }
+
+    console.log('重新获取tenant_access_token');
     const response = await axios.post(
       'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
       {
@@ -50,40 +153,62 @@ async function getTenantAccessToken() {
       tokenExpireTime = now + response.data.expire * 1000;
       return cachedToken;
     } else {
-      console.error('获取tenant_access_token失败:', response.data);
+      console.error('获取tenant_access_token失败:', {
+        code: response.data.code,
+        message: response.data.msg
+      });
       throw new Error(`获取tenant_access_token失败: ${response.data.msg}`);
     }
   } catch (error) {
-    console.error('获取tenant_access_token异常:', error);
-    console.error('获取tenant_access_token异常:', error.message);
+    console.error('获取tenant_access_token异常:', getSafeExternalError(error));
     throw error;
   }
 }
 
 // 获取多维表格数据
-async function getBitableData(token) {
+async function getBitableData(token, client = axios) {
   try {
-    const response = await axios.get(
-      `https://open.feishu.cn/open-apis/bitable/v1/apps/${process.env.APP_TOKEN}/tables/${process.env.TABLE_ID}/records`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json; charset=utf-8'
-        },
-        params: {
-          page_size: 100 // 获取更多数据
-        }
-      }
-    );
+    const items = [];
+    let pageToken;
+    let pageCount = 0;
 
-    if (response.data.code === 0) {
-      return response.data.data.items;
-    } else {
-      console.error('获取多维表格数据失败:', response.data);
-      throw new Error(`获取多维表格数据失败: ${response.data.msg}`);
-    }
+    do {
+      pageCount += 1;
+      if (pageCount > 100) {
+        throw new Error('飞书分页超过安全上限');
+      }
+      const response = await client.get(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${process.env.APP_TOKEN}/tables/${process.env.TABLE_ID}/records`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json; charset=utf-8'
+          },
+          params: {
+            page_size: 100,
+            ...(pageToken ? { page_token: pageToken } : {})
+          },
+          timeout: 10000,
+          maxContentLength: 5 * 1024 * 1024
+        }
+      );
+
+      if (response.data.code !== 0) {
+        console.error('获取多维表格数据失败:', {
+          code: response.data.code,
+          message: response.data.msg
+        });
+        throw new Error(`获取多维表格数据失败: ${response.data.msg}`);
+      }
+
+      const pageData = response.data.data || {};
+      items.push(...(Array.isArray(pageData.items) ? pageData.items : []));
+      pageToken = pageData.has_more ? pageData.page_token : undefined;
+    } while (pageToken);
+
+    return items;
   } catch (error) {
-    console.error('获取多维表格数据异常:', error.message);
+    console.error('获取多维表格数据异常:', getSafeExternalError(error));
     throw error;
   }
 }
@@ -115,23 +240,29 @@ function getLunarDateString() {
 function processTableData(items) {
   // 提取记录并按分类分组
   const records = items.map(item => {
-    const fields = item.fields;
+    const fields = item?.fields || {};
+    const localizedUrl = fields.网址;
+    const rawUrl = fields.url || (typeof localizedUrl === 'string' ? localizedUrl : localizedUrl?.link) || '';
+    const rawName = fields.name || fields.站点名称 || '';
     // 如果站点名称和网址都为空，则跳过该记录
-    if ((!fields.name && !fields.站点名称) && (!fields.url && !fields.网址)) {
+    if (!rawName && !rawUrl) {
       return null;
     }
+    const rawSort = fields.sort ?? fields.排序 ?? 0;
+    const numericSort = Number(rawSort);
+    const localizedIcon = fields.备用图标;
     return {
       id: item.record_id, // 添加记录ID
-      name: fields.name || fields.站点名称 || '',
-      url: fields.url || fields.网址.link || '',
-      category: fields.category || fields.分类 || '其它',
-      sort: fields.sort || fields.排序 || 0,
-      icon: fields?.icon?.link || fields?.备用图标?.link || ''
+      name: normalizeText(rawName, 50),
+      url: typeof rawUrl === 'string' ? rawUrl.trim() : '',
+      category: normalizeText(fields.category || fields.分类 || '其它', 20) || '其它',
+      sort: Number.isFinite(numericSort) ? numericSort : 0,
+      icon: fields?.icon?.link || localizedIcon?.link || ''
     };
   }).filter(record => record !== null); // 过滤掉空记录
 
   // 按分类分组
-  const groupedByCategory = {};
+  const groupedByCategory = Object.create(null);
   records.forEach(record => {
     if (!groupedByCategory[record.category]) {
       groupedByCategory[record.category] = [];
@@ -188,7 +319,7 @@ app.get('/api/navigation', async (req, res) => {
       data = processTableData(items);
       categories = Object.keys(data);
     } catch (apiError) {
-      console.log('无法从飞书API获取数据，使用模拟数据:', apiError.message);
+      console.warn('无法从飞书API获取数据，使用模拟数据:', getSafeExternalError(apiError));
       // 使用模拟数据
       data = mockData;
       categories = Object.keys(mockData);
@@ -200,15 +331,18 @@ app.get('/api/navigation', async (req, res) => {
     const today = new Date();
     const chineseWeekday = weekdays[today.getDay()];
     
+    res.set('Cache-Control', isMockData ? 'no-store' : 'private, max-age=60');
     res.json({
       success: true,
       isMockData: isMockData,
+      degraded: isMockData,
+      degradedReason: isMockData ? 'FEISHU_UNAVAILABLE' : null,
       data: data,
       categories: categories,
       timestamp: new Date().toISOString(),
       dateInfo: {
-        time: moment().format('HH:mm'),
-        date: moment().format('M月D日'),
+        time: `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`,
+        date: `${today.getMonth() + 1}月${today.getDate()}日`,
         weekday: chineseWeekday,
         lunarDate: getLunarDateString()
       }
@@ -220,6 +354,19 @@ app.get('/api/navigation', async (req, res) => {
       message: error.message
     });
   }
+});
+
+app.get('/api/health', (req, res) => {
+  const configuration = getConfigurationStatus();
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    ok: true,
+    degraded: !configuration.feishuConfigured,
+    feishuConfigured: configuration.feishuConfigured,
+    adminConfigured: configuration.adminConfigured,
+    missingConfiguration: configuration.missingFeishu,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Favicon代理端点
@@ -234,22 +381,11 @@ app.get('/api/favicon', async (req, res) => {
       });
     }
     
-    // 验证URL格式
-    let parsedUrl;
-    try {
-      parsedUrl = new URL(url);
-    } catch (e) {
+    const parsedUrl = parseHttpUrl(url);
+    if (!parsedUrl) {
       return res.status(400).json({
         success: false,
-        message: '无效的URL格式'
-      });
-    }
-    
-    // 只允许http和https协议
-    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-      return res.status(400).json({
-        success: false,
-        message: '只支持HTTP和HTTPS协议'
+        message: '仅支持有效的HTTP或HTTPS网址'
       });
     }
     
@@ -259,7 +395,8 @@ app.get('/api/favicon', async (req, res) => {
     // 代理请求到Google favicon服务
     const response = await axios.get(faviconUrl, {
       responseType: 'arraybuffer',
-      timeout: 5000 // 5秒超时
+      timeout: 5000,
+      maxContentLength: 1024 * 1024
     });
     
     // 设置正确的Content-Type
@@ -286,7 +423,7 @@ app.get('/', (req, res) => {
 });
 
 // 添加新的网站链接
-app.post('/api/links', async (req, res) => {
+app.post('/api/links', adminWriteLimiter, requireAdmin, async (req, res) => {
   try {
     // 解析请求体
     let requestBody = req.body;
@@ -299,43 +436,59 @@ app.post('/api/links', async (req, res) => {
       });
     }
     
+    const name = normalizeText(requestBody.name, 50);
+    const category = normalizeText(requestBody.category, 20);
+    const parsedUrl = parseHttpUrl(requestBody.url);
+    const numericSort = Number(requestBody.sort ?? 200);
+
     // 验证必要的字段
-    if (!requestBody.name || !requestBody.name.trim()) {
+    if (!name) {
       return res.status(400).json({
         success: false,
         message: '网站名称不能为空'
       });
     }
     
-    if (!requestBody.url || !requestBody.url.trim()) {
+    if (!requestBody.url || !String(requestBody.url).trim()) {
       return res.status(400).json({
         success: false,
         message: '网站网址不能为空'
       });
     }
     
-    if (!requestBody.category || !requestBody.category.trim()) {
+    if (!category) {
       return res.status(400).json({
         success: false,
         message: '分类不能为空'
       });
     }
-    
-    // 验证网址格式
-    try {
-      new URL(requestBody.url);
-    } catch (e) {
+
+    if (String(requestBody.category).trim().length > 20) {
       return res.status(400).json({
         success: false,
-        message: '无效的网址格式，请确保包含http://或https://'
+        message: '分类长度不能超过20个字符'
+      });
+    }
+    
+    if (!parsedUrl) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的网址格式，仅支持http://或https://'
       });
     }
     
     // 验证网站名称长度
-    if (requestBody.name.length > 50) {
+    if (String(requestBody.name).trim().length > 50) {
       return res.status(400).json({
         success: false,
         message: '网站名称长度不能超过50个字符'
+      });
+    }
+
+    if (!Number.isInteger(numericSort) || numericSort < 0 || numericSort > 999) {
+      return res.status(400).json({
+        success: false,
+        message: '排序必须是0到999之间的整数'
       });
     }
     
@@ -345,12 +498,12 @@ app.post('/api/links', async (req, res) => {
     // 构建请求体，符合飞书多维表格API的要求
     const createRecordBody = {
       fields: {
-        '分类': requestBody.category,
-        '排序': requestBody.sort || 200, // 默认排序值
-        '站点名称': requestBody.name,
+        '分类': category,
+        '排序': numericSort,
+        '站点名称': name,
         '网址': {
-          'link': requestBody.url,
-          'text': requestBody.name
+          'link': parsedUrl.href,
+          'text': name
         }
       }
     };
@@ -375,23 +528,23 @@ app.post('/api/links', async (req, res) => {
         data: response.data.data
       });
     } else {
-      console.error('飞书API错误:', response.data);
+      console.error('飞书API错误:', { code: response.data.code, message: response.data.msg });
       res.status(500).json({
         success: false,
         message: `添加链接失败: ${response.data.msg || '未知错误'}`
       });
     }
   } catch (error) {
-    console.error('添加链接异常:', error.message);
+    console.error('添加链接异常:', getSafeExternalError(error));
     res.status(500).json({
       success: false,
-      message: `添加链接失败: ${error.message}`
+      message: '添加链接失败，请稍后重试'
     });
   }
 });
 
 // 删除网站链接
-app.delete('/api/links/:id', async (req, res) => {
+app.delete('/api/links/:id', adminWriteLimiter, requireAdmin, async (req, res) => {
   try {
     const recordId = req.params.id;
     
@@ -399,6 +552,13 @@ app.delete('/api/links/:id', async (req, res) => {
       return res.status(400).json({
         success: false,
         message: '记录ID不能为空'
+      });
+    }
+
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(recordId)) {
+      return res.status(400).json({
+        success: false,
+        message: '记录ID格式无效'
       });
     }
     
@@ -424,22 +584,34 @@ app.delete('/api/links/:id', async (req, res) => {
         data: response.data.data
       });
     } else {
-      console.error('飞书API错误:', response.data);
+      console.error('飞书API错误:', { code: response.data.code, message: response.data.msg });
       res.status(500).json({
         success: false,
         message: `删除链接失败: ${response.data.msg || '未知错误'}`
       });
     }
   } catch (error) {
-    console.error('删除链接异常:', error.message);
+    console.error('删除链接异常:', getSafeExternalError(error));
     res.status(500).json({
       success: false,
-      message: `删除链接失败: ${error.message}`
+      message: '删除链接失败，请稍后重试'
     });
   }
 });
 
-// 启动服务器
-app.listen(PORT, () => {
-  console.log(`服务器运行在 http://localhost:${PORT}`);
-});
+// 本地直接运行时启动端口；被测试或Vercel加载时导出Express应用。
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`服务器运行在 http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
+module.exports._test = {
+  constantTimeEqual,
+  getBitableData,
+  getConfigurationStatus,
+  parseHttpUrl,
+  processTableData,
+  requireAdmin
+};

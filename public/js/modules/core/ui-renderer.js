@@ -42,8 +42,20 @@ class UIRenderer {
         iconClass = 'bi-diagram-3';
       }
 
-      li.innerHTML = `<i class="bi ${iconClass}"></i> ${category}`;
+      const icon = document.createElement('i');
+      icon.className = `bi ${iconClass}`;
+      icon.setAttribute('aria-hidden', 'true');
+      li.appendChild(icon);
+      li.appendChild(document.createTextNode(` ${category}`));
+      li.setAttribute('role', 'button');
+      li.tabIndex = 0;
       li.addEventListener('click', () => this.showTools(category));
+      li.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          this.showTools(category);
+        }
+      });
       this.categoryMenu.appendChild(li);
     });
   }
@@ -88,26 +100,10 @@ class UIRenderer {
   // 获取网站favicon的URL
   getFaviconUrl(url) {
     try {
-      // 检查url是否为对象（有些数据可能格式不正确）
-      if (typeof url === 'object') {
-        // 如果是对象，尝试使用link或text属性
-        if (url.link && typeof url.link === 'string') {
-          url = url.link;
-        } else if (url.text && typeof url.text === 'string') {
-          url = url.text;
-        } else {
-          // 如果没有可用的字符串属性，则返回null
-          return null;
-        }
-      }
+      const safeUrl = this.getSafeUrl(url);
+      if (!safeUrl) return null;
 
-      // 确保url是字符串
-      if (typeof url !== 'string' || !url.trim()) {
-        return null;
-      }
-
-      // 尝试创建URL对象
-      const urlObj = new URL(url);
+      const urlObj = new URL(safeUrl);
       const hostname = urlObj.hostname;
 
       // 检查内存缓存
@@ -131,17 +127,19 @@ class UIRenderer {
         // 静默处理LocalStorage错误
       }
 
-      // 使用Google的favicon服务作为主要方案
-      const googleFaviconUrl = `https://www.google.com/s2/favicons?sz=48&domain_url=${url}`;
+      // 通过同源代理获取favicon，避免浏览器直接向第三方暴露访问列表
+      const faviconProxyUrl = new URL('/api/favicon', window.location.origin);
+      faviconProxyUrl.searchParams.set('url', safeUrl);
+      const faviconUrl = `${faviconProxyUrl.pathname}${faviconProxyUrl.search}`;
 
       // 预缓存到内存（使用Google服务）
-      this.faviconCache.set(cacheKey, googleFaviconUrl);
+      this.faviconCache.set(cacheKey, faviconUrl);
 
       // 异步缓存到LocalStorage（不阻塞主线程）
       setTimeout(() => {
         try {
           localStorage.setItem(cacheKey, JSON.stringify({
-            url: googleFaviconUrl,
+            url: faviconUrl,
             timestamp: Date.now(),
             ttl: 24 * 60 * 60 * 1000 // 24小时
           }));
@@ -150,7 +148,7 @@ class UIRenderer {
         }
       }, 0);
 
-      return googleFaviconUrl;
+      return faviconUrl;
 
     } catch (e) {
       // 静默处理URL错误，返回null使用文字图标
@@ -158,8 +156,25 @@ class UIRenderer {
     }
   }
 
+  getSafeUrl(value) {
+    let candidate = value;
+    if (candidate && typeof candidate === 'object') {
+      candidate = candidate.link || candidate.text || '';
+    }
+
+    if (typeof candidate !== 'string' || !candidate.trim()) return null;
+
+    try {
+      const parsed = new URL(candidate.trim());
+      const supportedProtocol = ['http:', 'https:'].includes(parsed.protocol);
+      return supportedProtocol && !parsed.username && !parsed.password ? parsed.href : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   // 生成文字图标
-  generateTextIcon(name) {
+  createTextIcon(name) {
     // 获取名称的第一个字符（如果是中文）或前两个字符的首字母（如果是英文）
     let iconText = '';
     if (/[\u4e00-\u9fa5]/.test(name[0])) {
@@ -187,7 +202,12 @@ class UIRenderer {
     const bgColor = `hsl(${hue}, 70%, ${lightness}%)`;
     const textColor = `hsl(${hue}, 70%, 30%)`;
 
-    return `<div class="text-icon" style="background-color: ${bgColor}; color: ${textColor};">${iconText}</div>`;
+    const textIcon = document.createElement('div');
+    textIcon.className = 'text-icon';
+    textIcon.style.backgroundColor = bgColor;
+    textIcon.style.color = textColor;
+    textIcon.textContent = iconText;
+    return textIcon;
   }
 
   // 添加工具项
@@ -198,70 +218,75 @@ class UIRenderer {
 
     // 创建链接元素
     const linkElement = document.createElement('a');
-    // 解析URL，兼容对象格式 { link: string } 或 { text: string }
-    let urlString = '';
-    if (tool && tool.url) {
-      if (typeof tool.url === 'string') {
-        urlString = tool.url;
-      } else if (typeof tool.url === 'object') {
-        if (tool.url.link && typeof tool.url.link === 'string') {
-          urlString = tool.url.link;
-        } else if (tool.url.text && typeof tool.url.text === 'string') {
-          urlString = tool.url.text;
-        }
-      }
+    const safeUrl = this.getSafeUrl(tool?.url);
+    linkElement.href = safeUrl || '#';
+    if (safeUrl) {
+      linkElement.target = '_blank';
+    } else {
+      linkElement.setAttribute('aria-disabled', 'true');
+      linkElement.addEventListener('click', event => event.preventDefault());
     }
-    linkElement.href = urlString || '#';
-    linkElement.target = '_blank';
     linkElement.rel = 'noopener noreferrer';
     if (tool && tool.name) {
       linkElement.title = tool.name;
     }
 
     // 使用图标（如果有）或尝试获取网站favicon或生成文字图标
-    let iconHtml = '';
-    let useFavicon = false;
+    const name = typeof tool?.name === 'string' && tool.name.trim() ? tool.name.trim() : '未命名网站';
+    const fallbackIcon = this.createTextIcon(name);
+    let primaryIcon = null;
 
     if (tool.icon && typeof tool.icon === 'string' && tool.icon.trim()) {
-      // 如果是URL，使用img标签      
-      if (tool.icon.startsWith('http')) {
-        iconHtml = `<img src="${tool.icon}" alt="${tool.name}" class="tool-icon">`;
-      } else {
-        // 否则假设是Bootstrap图标类名
-        iconHtml = `<i class="bi ${tool.icon} tool-icon"></i>`;
-      }
-    } else {
-      // 尝试使用网站的favicon
-      const faviconUrl = this.getFaviconUrl(tool.url);
-      if (faviconUrl) {
-        // 添加onerror处理，当图标加载失败时显示文字图标
-        iconHtml = `<img src="${faviconUrl}" alt="${tool.name}" class="tool-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">`;
-        useFavicon = true;
-      }
-
-      // 添加文字图标作为备用或默认选项
-      // 如果工具名称为空则跳过生成图标
-      if (tool.name) {
-        const textIconHtml = this.generateTextIcon(tool.name);
-        iconHtml += textIconHtml;
-      }
-
-      if (useFavicon) {
-        // 如果使用favicon，初始隐藏文字图标
-        iconHtml = iconHtml.replace('<div class="text-icon"', '<div class="text-icon" style="display: none;"');
+      const safeIconUrl = this.getSafeUrl(tool.icon);
+      if (safeIconUrl) {
+        primaryIcon = document.createElement('img');
+        primaryIcon.src = safeIconUrl;
+        primaryIcon.alt = '';
+        primaryIcon.className = 'tool-icon';
+      } else if (/^bi-[a-z0-9-]+$/.test(tool.icon.trim())) {
+        primaryIcon = document.createElement('i');
+        primaryIcon.className = `bi ${tool.icon.trim()} tool-icon`;
+        primaryIcon.setAttribute('aria-hidden', 'true');
       }
     }
 
-    linkElement.innerHTML = `
-      ${iconHtml}
-      <div class="tool-name">${tool.name}</div>
-    `;
+    if (!primaryIcon) {
+      // 尝试使用网站的favicon
+      const faviconUrl = this.getFaviconUrl(tool.url);
+      if (faviconUrl) {
+        primaryIcon = document.createElement('img');
+        primaryIcon.src = faviconUrl;
+        primaryIcon.alt = '';
+        primaryIcon.className = 'tool-icon';
+      }
+    }
+
+    if (primaryIcon) {
+      fallbackIcon.style.display = 'none';
+      if (primaryIcon.tagName === 'IMG') {
+        primaryIcon.addEventListener('error', () => {
+          primaryIcon.style.display = 'none';
+          fallbackIcon.style.display = 'flex';
+        });
+      }
+      linkElement.appendChild(primaryIcon);
+    }
+
+    linkElement.appendChild(fallbackIcon);
+    const nameElement = document.createElement('div');
+    nameElement.className = 'tool-name';
+    nameElement.textContent = name;
+    linkElement.appendChild(nameElement);
 
     // 添加删除按钮
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'tool-item-delete-btn';
-    deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+    const deleteIcon = document.createElement('i');
+    deleteIcon.className = 'bi bi-trash';
+    deleteIcon.setAttribute('aria-hidden', 'true');
+    deleteBtn.appendChild(deleteIcon);
     deleteBtn.title = '删除网站';
+    deleteBtn.setAttribute('aria-label', `删除网站 ${name}`);
     deleteBtn.dataset.toolId = tool.id || '';
     deleteBtn.dataset.toolName = tool.name || '';
 
@@ -329,12 +354,17 @@ class UIRenderer {
   showError(message) {
     if (!this.toolsGrid) return;
 
-    this.toolsGrid.innerHTML = `
-      <div style="text-align: center; width: 100%; padding: 30px;">
-        <i class="bi bi-exclamation-triangle" style="font-size: 48px; color: #ff4d4f; margin-bottom: 20px;"></i>
-        <p style="color: #666;">${message}</p>
-      </div>
-    `;
+    this.toolsGrid.innerHTML = '';
+    const errorContainer = document.createElement('div');
+    errorContainer.style.cssText = 'text-align: center; width: 100%; padding: 30px;';
+    const icon = document.createElement('i');
+    icon.className = 'bi bi-exclamation-triangle';
+    icon.style.cssText = 'font-size: 48px; color: #ff4d4f; margin-bottom: 20px;';
+    const text = document.createElement('p');
+    text.style.color = '#666';
+    text.textContent = message;
+    errorContainer.append(icon, text);
+    this.toolsGrid.appendChild(errorContainer);
   }
 
   // 更新时间信息

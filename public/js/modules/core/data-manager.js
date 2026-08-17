@@ -8,6 +8,7 @@ class DataManager {
     this.dateInfo = null;
     this.CACHE_DURATION = 60 * 60 * 1000; // 缓存1小时
     this.CACHE_KEY = 'navsite_navigation_cache'; // LocalStorage键名
+    this.ADMIN_TOKEN_KEY = 'navsite_admin_token'; // 仅保存在当前浏览器会话
   }
 
   // 从LocalStorage读取缓存数据
@@ -94,6 +95,10 @@ class DataManager {
         this.dateInfo = result.dateInfo;
         const isMockData = result.isMockData;
 
+        if (result.degraded) {
+          console.warn('导航服务当前处于降级状态，正在展示演示数据');
+        }
+
         // 只有非模拟数据才进行缓存
         if (!isMockData) {
           console.log('非模拟数据，开始缓存...');
@@ -144,10 +149,12 @@ class DataManager {
       ]
     };
 
+    const now = new Date();
+    const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
     this.dateInfo = {
-      date: '12月25日',
-      weekday: '星期一',
-      lunarDate: '腊月初五'
+      date: `${now.getMonth() + 1}月${now.getDate()}日`,
+      weekday: weekdays[now.getDay()],
+      lunarDate: ''
     };
 
     // 默认数据不再缓存，以便下次尝试从API获取最新数据
@@ -164,15 +171,25 @@ class DataManager {
   // 添加链接
   async addLink(linkData) {
     try {
+      const adminToken = this.getAdminToken(true);
+      if (!adminToken) {
+        return { success: false, message: '已取消管理员验证' };
+      }
+
       const response = await fetch('/api/links', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
         },
         body: JSON.stringify(linkData)
       });
 
       const result = await response.json();
+
+      if (response.status === 401 || result.code === 'ADMIN_NOT_CONFIGURED') {
+        this.clearAdminToken();
+      }
 
       if (result.success) {
         // 清除缓存，强制下次重新获取数据
@@ -192,14 +209,24 @@ class DataManager {
   // 删除链接
   async deleteLink(linkId) {
     try {
+      const adminToken = this.getAdminToken(true);
+      if (!adminToken) {
+        return { success: false, message: '已取消管理员验证' };
+      }
+
       const response = await fetch(`/api/links/${linkId}`, {
         method: 'DELETE',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
         }
       });
 
       const result = await response.json();
+
+      if (response.status === 401 || result.code === 'ADMIN_NOT_CONFIGURED') {
+        this.clearAdminToken();
+      }
 
       if (result.success) {
         // 清除缓存，强制下次重新获取数据
@@ -223,6 +250,37 @@ class DataManager {
       console.log('已清除LocalStorage缓存');
     } catch (error) {
       console.warn('清除缓存失败:', error);
+    }
+  }
+
+  // 管理员令牌仅存储在当前标签页会话中，关闭浏览器后自动失效
+  getAdminToken(promptIfMissing = false) {
+    let token = '';
+    try {
+      token = sessionStorage.getItem(this.ADMIN_TOKEN_KEY) || '';
+    } catch (error) {
+      console.warn('无法读取管理员会话:', error);
+    }
+
+    if (!token && promptIfMissing) {
+      token = window.prompt('请输入管理员令牌')?.trim() || '';
+      if (token) {
+        try {
+          sessionStorage.setItem(this.ADMIN_TOKEN_KEY, token);
+        } catch (error) {
+          console.warn('无法保存管理员会话:', error);
+        }
+      }
+    }
+
+    return token;
+  }
+
+  clearAdminToken() {
+    try {
+      sessionStorage.removeItem(this.ADMIN_TOKEN_KEY);
+    } catch (error) {
+      console.warn('无法清除管理员会话:', error);
     }
   }
 

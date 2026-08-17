@@ -1,7 +1,6 @@
 // Service Worker for 水果导航 PWA
-const CACHE_NAME = 'fruit-nav-v1.2.0';
-const STATIC_CACHE_NAME = 'fruit-nav-static-v1.2.0';
-const API_CACHE_NAME = 'fruit-nav-api-v1.2.0';
+const STATIC_CACHE_NAME = 'fruit-nav-static-v1.3.0';
+const API_CACHE_NAME = 'fruit-nav-api-v1.3.0';
 
 // 需要缓存的静态资源
 const STATIC_ASSETS = [
@@ -9,18 +8,17 @@ const STATIC_ASSETS = [
   '/index.html',
   '/css/style.css',
   '/js/app.js',
-  '/img/avatar.svg',
-  '/img/favicon.ico',
-  '/manifest.json',
-  // 外部资源
-  'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap'
-];
-
-// API 端点
-const API_ENDPOINTS = [
-  '/api/navigation-data',
-  '/api/favicon'
+  '/js/modules/core/pwa-manager.js',
+  '/js/modules/core/theme-manager.js',
+  '/js/modules/core/data-manager.js',
+  '/js/modules/core/ui-renderer.js',
+  '/js/modules/features/link-manager.js',
+  '/js/modules/features/interaction-manager.js',
+  '/js/modules/utils/common-utils.js',
+  '/img/logo.png',
+  '/img/icons/icon-192x192.png',
+  '/img/icons/icon-512x512.png',
+  '/manifest.json'
 ];
 
 // 安装事件 - 预缓存静态资源
@@ -28,15 +26,12 @@ self.addEventListener('install', (event) => {
   console.log('[Service Worker] Installing...');
   
   event.waitUntil(
-    Promise.all([
-      // 缓存静态资源
-      caches.open(STATIC_CACHE_NAME).then((cache) => {
-        console.log('[Service Worker] Caching static assets');
+    caches.open(STATIC_CACHE_NAME)
+      .then((cache) => {
+        console.log('[Service Worker] Caching same-origin static assets');
         return cache.addAll(STATIC_ASSETS);
-      }),
-      // 跳过等待，立即激活
-      self.skipWaiting()
-    ])
+      })
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -50,9 +45,7 @@ self.addEventListener('activate', (event) => {
       caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
-            if (cacheName !== STATIC_CACHE_NAME && 
-                cacheName !== API_CACHE_NAME &&
-                cacheName !== CACHE_NAME) {
+            if (cacheName !== STATIC_CACHE_NAME && cacheName !== API_CACHE_NAME) {
               console.log('[Service Worker] Deleting old cache:', cacheName);
               return caches.delete(cacheName);
             }
@@ -157,14 +150,17 @@ async function networkFirstWithFallback(request) {
     console.log('[Service Worker] Fetching from network:', request.url);
     const networkResponse = await fetch(request);
     
-    if (networkResponse.ok) {
+    if (await shouldCacheApiResponse(request, networkResponse)) {
       // 缓存成功的API响应
       const cache = await caches.open(API_CACHE_NAME);
-      cache.put(request, networkResponse.clone());
-      return networkResponse;
+      await cache.put(request, networkResponse.clone());
     }
-    
-    throw new Error('Network response not ok');
+
+    if (!networkResponse.ok) {
+      throw new Error('Network response not ok');
+    }
+
+    return networkResponse;
   } catch (error) {
     console.log('[Service Worker] Network failed, trying cache:', request.url);
     
@@ -176,16 +172,14 @@ async function networkFirstWithFallback(request) {
     }
     
     // 如果是导航数据API请求失败，返回降级数据
-    if (request.url.includes('/api/navigation-data')) {
+    if (request.url.includes('/api/navigation')) {
       return new Response(JSON.stringify({
         success: false,
         message: '网络连接失败，请检查网络后重试',
-        data: {
-          categories: [
-            { name: "全部", count: 0 }
-          ],
-          tools: []
-        }
+        data: {},
+        categories: [],
+        degraded: true,
+        degradedReason: 'NETWORK_UNAVAILABLE'
       }), {
         status: 200,
         headers: {
@@ -196,6 +190,21 @@ async function networkFirstWithFallback(request) {
     }
     
     throw error;
+  }
+}
+
+async function shouldCacheApiResponse(request, response) {
+  if (!response.ok) return false;
+  if ((response.headers.get('cache-control') || '').includes('no-store')) return false;
+
+  const url = new URL(request.url);
+  if (url.pathname !== '/api/navigation') return true;
+
+  try {
+    const payload = await response.clone().json();
+    return payload.success === true && payload.isMockData !== true;
+  } catch (error) {
+    return false;
   }
 }
 
@@ -231,7 +240,7 @@ self.addEventListener('message', (event) => {
         self.skipWaiting();
         break;
       case 'GET_VERSION':
-        event.ports[0].postMessage({ version: CACHE_NAME });
+        event.ports[0].postMessage({ version: STATIC_CACHE_NAME });
         break;
       case 'CLEAR_CACHE':
         clearAllCaches().then(() => {

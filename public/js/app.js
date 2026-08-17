@@ -77,13 +77,6 @@ async function initApp() {
         window.utils.refreshToolIcons();
       }
       
-      // 验证用户偏好持久化功能
-      setTimeout(() => {
-        const isValid = window.utils.validatePersistence();
-        if (isValid) {
-          console.log('✅ 用户皮肤切换功能初始化成功');
-        }
-      }, 500);
     }, 800);
     
   } catch (error) {
@@ -162,6 +155,12 @@ function bindEventListeners() {
   const homeMenuItem = document.querySelector('[data-category="all"]');
   if (homeMenuItem) {
     homeMenuItem.addEventListener('click', () => uiRenderer.showTools('all'));
+    homeMenuItem.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        uiRenderer.showTools('all');
+      }
+    });
   }
 
   // 数据变更事件监听器
@@ -175,22 +174,22 @@ function bindEventListeners() {
 function handleInitError(error) {
   const toolsGrid = document.getElementById('tools-grid');
   if (toolsGrid) {
-    toolsGrid.innerHTML = `
-      <div style="text-align: center; padding: 40px; color: #666;">
-        <i class="bi bi-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px; color: #ff4d4f;"></i>
-        <h3>页面加载失败</h3>
-        <p>请刷新页面重试</p>
-        <button onclick="location.reload()" style="
-          margin-top: 20px;
-          padding: 10px 20px;
-          background: #1677ff;
-          color: white;
-          border: none;
-          border-radius: 6px;
-          cursor: pointer;
-        ">刷新页面</button>
-      </div>
-    `;
+    toolsGrid.innerHTML = '';
+    const container = document.createElement('div');
+    container.style.cssText = 'text-align: center; padding: 40px; color: #666;';
+    const icon = document.createElement('i');
+    icon.className = 'bi bi-exclamation-triangle';
+    icon.style.cssText = 'font-size: 48px; margin-bottom: 20px; color: #ff4d4f;';
+    const title = document.createElement('h3');
+    title.textContent = '页面加载失败';
+    const message = document.createElement('p');
+    message.textContent = '请刷新页面重试';
+    const reloadButton = document.createElement('button');
+    reloadButton.textContent = '刷新页面';
+    reloadButton.style.cssText = 'margin-top: 20px; padding: 10px 20px; background: #1677ff; color: white; border: none; border-radius: 6px; cursor: pointer;';
+    reloadButton.addEventListener('click', () => location.reload());
+    container.append(icon, title, message, reloadButton);
+    toolsGrid.appendChild(container);
   }
 }
 

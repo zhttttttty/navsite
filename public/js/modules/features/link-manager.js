@@ -251,9 +251,12 @@ class LinkManager {
       isValid = false;
     } else {
       try {
-        new URL(siteUrl);
+        const parsedUrl = new URL(siteUrl);
+        if (!['http:', 'https:'].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) {
+          throw new Error('unsupported protocol');
+        }
       } catch (e) {
-        this.showError('url', '无效的网址格式，请确保包含http://或https://');
+        this.showError('url', '无效的网址格式，仅支持http://或https://');
         isValid = false;
       }
     }
@@ -480,10 +483,12 @@ class LinkManager {
 
     const messageElement = document.createElement('div');
     messageElement.className = 'success-message';
-    messageElement.innerHTML = `
-      <i class="bi bi-check-circle"></i>
-      <span>${message}</span>
-    `;
+    const icon = document.createElement('i');
+    icon.className = 'bi bi-check-circle';
+    icon.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.textContent = message;
+    messageElement.append(icon, text);
 
     // 添加样式
     Object.assign(messageElement.style, {
@@ -553,10 +558,12 @@ class LinkManager {
 
     const messageElement = document.createElement('div');
     messageElement.className = 'error-message';
-    messageElement.innerHTML = `
-      <i class="bi bi-exclamation-circle"></i>
-      <span>${message}</span>
-    `;
+    const icon = document.createElement('i');
+    icon.className = 'bi bi-exclamation-circle';
+    icon.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.textContent = message;
+    messageElement.append(icon, text);
 
     // 添加样式
     Object.assign(messageElement.style, {
