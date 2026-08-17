@@ -1,6 +1,6 @@
 {
   "name": "website-navigation",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "导航网站",
   "main": "server.js",
   "scripts": {
