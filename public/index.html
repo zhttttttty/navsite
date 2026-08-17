@@ -46,7 +46,7 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="/vendor/bootstrap-icons/bootstrap-icons.min.css">
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap"
     rel="stylesheet">
 </head>
 
@@ -177,7 +177,6 @@
       <!-- 顶部信息区 -->
       <header class="top-info dashboard-header">
         <div class="workspace-intro">
-          <span class="workspace-kicker"><i class="bi bi-grid-1x2" aria-hidden="true"></i> 个人工作台</span>
           <h1>水果导航</h1>
           <p><strong id="site-count">--</strong> 个站点 <span aria-hidden="true">·</span> <strong id="category-count">--</strong> 个分类</p>
         </div>
@@ -189,7 +188,7 @@
 
       <section class="search-panel" aria-label="搜索">
         <div class="site-search">
-          <span class="search-symbol" aria-hidden="true">⌕</span>
+          <i class="bi bi-search search-symbol" aria-hidden="true"></i>
           <input id="site-search-input" type="search" autocomplete="off" placeholder="搜索网站、分类或域名" aria-label="搜索导航网站">
           <kbd>Ctrl K</kbd>
         </div>
@@ -237,7 +236,7 @@
             <div class="error-message" id="url-error"></div>
             <div id="favicon-preview" class="favicon-preview" hidden>
               <span class="favicon-preview-icon">
-                <img id="favicon-preview-image" alt="">
+                <img id="favicon-preview-image" src="img/logo.png" alt="" hidden>
                 <span id="favicon-preview-fallback" aria-hidden="true">?</span>
               </span>
               <span class="favicon-preview-copy">

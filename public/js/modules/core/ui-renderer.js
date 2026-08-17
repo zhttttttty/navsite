@@ -338,7 +338,10 @@ class UIRenderer {
     // 添加删除按钮
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'tool-item-delete-btn';
-    deleteBtn.textContent = '×';
+    const deleteIcon = document.createElement('i');
+    deleteIcon.className = 'bi bi-trash3';
+    deleteIcon.setAttribute('aria-hidden', 'true');
+    deleteBtn.appendChild(deleteIcon);
     deleteBtn.title = '删除网站';
     deleteBtn.setAttribute('aria-label', `删除网站 ${name}`);
     deleteBtn.dataset.toolId = tool.id || '';
@@ -355,7 +358,10 @@ class UIRenderer {
 
     const refreshBtn = document.createElement('button');
     refreshBtn.className = 'tool-item-refresh-btn';
-    refreshBtn.textContent = '↻';
+    const refreshIcon = document.createElement('i');
+    refreshIcon.className = 'bi bi-arrow-clockwise';
+    refreshIcon.setAttribute('aria-hidden', 'true');
+    refreshBtn.appendChild(refreshIcon);
     refreshBtn.title = '重新抓取图标';
     refreshBtn.setAttribute('aria-label', `重新抓取 ${name} 的图标`);
     refreshBtn.addEventListener('click', event => {

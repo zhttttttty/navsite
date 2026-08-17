@@ -9,36 +9,36 @@ const SKIN_THEMES = {
     icon: 'bi-stars',
     colors: {
       light: {
-        primary: '#FF0066',
+        primary: '#C6004F',
         secondary: '#4500FF',
         accent: '#0006FF',
         accentGreen: '#00FFAA',
         warning: '#FF8800',
-        danger: '#FF4D4F',
-        neonPink: '#FF0066',
+        danger: '#B4232F',
+        neonPink: '#C6004F',
         neonCyan: '#00F6FF',
         neonPurple: '#4500FF',
         textHigh: '#FFFFFF',
         textMid: '#8B86BD',
         textLow: '#5E55E7',
-        primaryBg: 'linear-gradient(135deg, #050012, #0D0122, #1a0033)',
+        primaryBg: '#080016',
         glassBg: 'rgba(255, 255, 255, 0.8)',
         elevatedBg: 'rgba(13, 1, 34, 0.8)'
       },
       dark: {
-        primary: '#FF0066',
+        primary: '#C6004F',
         secondary: '#4500FF',
         accent: '#0006FF',
         accentGreen: '#00FFAA',
         warning: '#FF8800',
-        danger: '#FF4D4F',
-        neonPink: '#FF0066',
+        danger: '#B4232F',
+        neonPink: '#C6004F',
         neonCyan: '#00F6FF',
         neonPurple: '#4500FF',
         textHigh: '#FFFFFF',
         textMid: '#8B86BD',
         textLow: '#5E55E7',
-        primaryBg: 'linear-gradient(135deg, #050012, #0D0122, #1a0033)',
+        primaryBg: '#080016',
         glassBg: 'rgba(13, 1, 34, 0.6)',
         elevatedBg: 'rgba(13, 1, 34, 0.8)'
       }
@@ -366,8 +366,8 @@ class ThemeManager {
       root.style.setProperty('--time-color', colors.textHigh);
       root.style.setProperty('--date-color', colors.textMid);
       root.style.setProperty('--tool-item-bg', colors.glassBg);
-      root.style.setProperty('--tool-item-shadow', `0 2px 12px rgba(${this.hexToRgb(colors.primary)}, 0.2)`);
-      root.style.setProperty('--tool-item-hover-shadow', `0 0 20px rgba(${this.hexToRgb(colors.neonPink)}, 0.5)`);
+      root.style.setProperty('--tool-item-shadow', '0 6px 16px rgba(0, 0, 0, 0.2)');
+      root.style.setProperty('--tool-item-hover-shadow', '0 12px 26px rgba(0, 0, 0, 0.28)');
       root.style.setProperty('--tool-icon-color', colors.textHigh);
       root.style.setProperty('--tool-name-color', colors.textHigh);
     } else {

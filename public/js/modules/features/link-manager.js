@@ -144,8 +144,8 @@ class LinkManager {
     preview.hidden = false;
     domain.textContent = parsedUrl.hostname.replace(/^www\./, '');
     fallback.textContent = (parsedUrl.hostname.replace(/^www\./, '')[0] || '?').toUpperCase();
-    fallback.style.display = 'none';
-    image.style.display = 'block';
+    fallback.hidden = true;
+    image.hidden = false;
     status.textContent = '正在识别图标…';
 
     const faviconUrl = new URL('/api/favicon', window.location.origin);
@@ -154,8 +154,8 @@ class LinkManager {
     if (forceRefresh) faviconUrl.searchParams.set('refresh', String(Date.now()));
 
     const showFallback = () => {
-      image.style.display = 'none';
-      fallback.style.display = 'flex';
+      image.hidden = true;
+      fallback.hidden = false;
       status.textContent = '未找到图标，将使用文字标识';
     };
     image.onload = () => {
