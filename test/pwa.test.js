@@ -102,6 +102,64 @@ test('homepage exposes search, grouped navigation and explicit management mode',
   assert.match(app, /classList\.toggle\('edit-mode'\)/);
 });
 
+test('command palette supports local pinyin matching and keyboard navigation', () => {
+  const index = fs.readFileSync(path.join(projectRoot, 'public', 'index.html'), 'utf8');
+  const palette = fs.readFileSync(
+    path.join(projectRoot, 'public', 'js', 'modules', 'features', 'command-palette.js'),
+    'utf8'
+  );
+  const renderer = fs.readFileSync(
+    path.join(projectRoot, 'public', 'js', 'modules', 'core', 'ui-renderer.js'),
+    'utf8'
+  );
+  const PinyinMatch = require('pinyin-match');
+
+  assert.match(index, /id="command-palette"/);
+  assert.match(index, /vendor\/pinyin-match\/pinyin-match\.js/);
+  assert.doesNotMatch(index, /unpkg\.com|cdn\.jsdelivr\.net\/npm\/pinyin-match/);
+  assert.match(palette, /event\.key === 'ArrowDown'/);
+  assert.match(palette, /event\.key === 'ArrowUp'/);
+  assert.match(palette, /event\.key === '\/'/);
+  assert.match(palette, /window\.open\(safeUrl, '_blank'/);
+  assert.match(renderer, /window\.PinyinMatch\.match/);
+  assert.notEqual(PinyinMatch.match('百度', 'bd'), false);
+  assert.notEqual(PinyinMatch.match('哔哩哔哩', 'bili'), false);
+});
+
+test('personalization remains local and navigation supports compact view and scroll spy', () => {
+  const personalization = fs.readFileSync(
+    path.join(projectRoot, 'public', 'js', 'modules', 'features', 'personalization-manager.js'),
+    'utf8'
+  );
+  const renderer = fs.readFileSync(
+    path.join(projectRoot, 'public', 'js', 'modules', 'core', 'ui-renderer.js'),
+    'utf8'
+  );
+  const css = fs.readFileSync(path.join(projectRoot, 'public', 'css', 'style.css'), 'utf8');
+
+  assert.match(personalization, /navsite_pinned_sites/);
+  assert.match(personalization, /navsite_recent_sites/);
+  assert.match(personalization, /navsite_view_mode/);
+  assert.doesNotMatch(personalization, /fetch\(/);
+  assert.match(renderer, /new IntersectionObserver/);
+  assert.match(renderer, /scrollIntoView\(\{ behavior: 'smooth'/);
+  assert.match(renderer, /category-menu-badge/);
+  assert.match(css, /body\[data-view-mode="compact"\]/);
+  assert.match(css, /\.particles\s*\{\s*display: none;/);
+});
+
+test('cached navigation data is rendered first and refreshed in the background', () => {
+  const dataManager = fs.readFileSync(
+    path.join(projectRoot, 'public', 'js', 'modules', 'core', 'data-manager.js'),
+    'utf8'
+  );
+
+  assert.match(dataManager, /setTimeout\(\(\) => this\.refreshNavigationData\(\), 0\)/);
+  assert.match(dataManager, /new CustomEvent\('navigationRefreshed'/);
+  assert.match(dataManager, /if \(result\.isMockData \|\| result\.degraded\) return/);
+  assert.match(dataManager, /后台刷新导航数据失败，继续使用本地缓存/);
+});
+
 test('PWA manager leaves installation UI to the browser', () => {
   const pwaManager = fs.readFileSync(
     path.join(projectRoot, 'public', 'js', 'modules', 'core', 'pwa-manager.js'),

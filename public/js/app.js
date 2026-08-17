@@ -13,8 +13,10 @@ function loadModules() {
     '/js/modules/core/ui-renderer.js',
     
     // 功能模块
+    '/js/modules/features/command-palette.js',
     '/js/modules/features/link-manager.js',
     '/js/modules/features/interaction-manager.js',
+    '/js/modules/features/personalization-manager.js',
     
     // 工具模块
     '/js/modules/utils/common-utils.js'
@@ -40,15 +42,14 @@ let themeManager = null;
 let pwaManager = null;
 let linkManager = null;
 let interactionManager = null;
+let personalizationManager = null;
+let commandPalette = null;
 
 // 初始化应用程序
 async function initApp() {
   try {
     // 显示页面加载动画
     window.utils.showPageLoader();
-    
-    // 初始化粒子系统
-    window.utils.initParticles();
     
     // 初始化核心模块
     await initCoreModules();
@@ -112,6 +113,14 @@ async function initFeatureModules() {
   // 初始化链接管理器
   linkManager = new window.LinkManager(dataManager);
   window.linkManager = linkManager; // 设置全局引用
+
+  personalizationManager = new window.PersonalizationManager(dataManager, uiRenderer);
+  personalizationManager.init();
+  window.personalizationManager = personalizationManager;
+
+  commandPalette = new window.CommandPalette(dataManager, uiRenderer, personalizationManager);
+  commandPalette.init();
+  window.commandPalette = commandPalette;
 }
 
 // 加载并显示数据
@@ -170,6 +179,12 @@ function bindEventListeners() {
     await loadAndDisplayData();
   });
 
+  window.addEventListener('navigationRefreshed', event => {
+    uiRenderer.generateCategoryMenu();
+    uiRenderer.showTools(uiRenderer.getCurrentCategory());
+    if (event.detail?.dateInfo) uiRenderer.updateDateInfo(event.detail.dateInfo);
+  });
+
   bindSearchControls();
   bindManageMode();
 }
@@ -181,14 +196,17 @@ function bindSearchControls() {
   if (!input || !engineSelect || !webSearchButton) return;
 
   const savedEngine = localStorage.getItem('navsite_search_engine');
-  if (['bing', 'baidu', 'google'].includes(savedEngine)) {
+  const engineNames = ['bing', 'baidu', 'google', 'github', 'bilibili'];
+  if (engineNames.includes(savedEngine)) {
     engineSelect.value = savedEngine;
   }
 
   const searchUrls = {
     bing: 'https://www.bing.com/search?q=',
     baidu: 'https://www.baidu.com/s?wd=',
-    google: 'https://www.google.com/search?q='
+    google: 'https://www.google.com/search?q=',
+    github: 'https://github.com/search?q=',
+    bilibili: 'https://search.bilibili.com/all?keyword='
   };
 
   const searchWeb = () => {
@@ -204,19 +222,19 @@ function bindSearchControls() {
   input.addEventListener('input', () => uiRenderer.setSearchQuery(input.value));
   input.addEventListener('keydown', event => {
     if (event.key === 'Enter' && event.ctrlKey) searchWeb();
+    if (event.altKey && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      event.preventDefault();
+      const offset = event.key === 'ArrowRight' ? 1 : -1;
+      const currentIndex = engineNames.indexOf(engineSelect.value);
+      engineSelect.value = engineNames[(currentIndex + offset + engineNames.length) % engineNames.length];
+      localStorage.setItem('navsite_search_engine', engineSelect.value);
+    }
   });
   engineSelect.addEventListener('change', () => {
     localStorage.setItem('navsite_search_engine', engineSelect.value);
   });
   webSearchButton.addEventListener('click', searchWeb);
 
-  document.addEventListener('keydown', event => {
-    if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === 'k') {
-      event.preventDefault();
-      input.focus();
-      input.select();
-    }
-  });
 }
 
 function bindManageMode() {

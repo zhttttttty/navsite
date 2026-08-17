@@ -7,6 +7,8 @@ class UIRenderer {
     this.currentCategory = 'all';
     this.searchQuery = '';
     this.faviconCache = new Map();
+    this.personalizationManager = null;
+    this.scrollObserver = null;
 
     // DOM元素引用
     this.categoryMenu = document.getElementById('category-menu');
@@ -19,7 +21,7 @@ class UIRenderer {
   generateCategoryMenu() {
     if (!this.categoryMenu) return;
 
-    const { categories } = this.dataManager.getCurrentData();
+    const { navigationData, categories } = this.dataManager.getCurrentData();
 
     // 保留第一个"主页"菜单项
     const homeMenuItem = this.categoryMenu.firstElementChild;
@@ -48,10 +50,15 @@ class UIRenderer {
       icon.setAttribute('aria-hidden', 'true');
       li.appendChild(icon);
       li.appendChild(document.createTextNode(` ${category}`));
+      const badge = document.createElement('span');
+      badge.className = 'category-menu-badge';
+      badge.textContent = String((navigationData[category] || []).length);
+      badge.setAttribute('aria-label', `${(navigationData[category] || []).length} 个网站`);
+      li.appendChild(badge);
       li.setAttribute('role', 'button');
       li.tabIndex = 0;
       li.addEventListener('click', () => {
-        this.showTools(category);
+        this.navigateToCategory(category);
         if (window.innerWidth <= 768 && window.interactionManager) {
           window.interactionManager.closeMobileMenu();
         }
@@ -59,7 +66,7 @@ class UIRenderer {
       li.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          this.showTools(category);
+          this.navigateToCategory(category);
         }
       });
       this.categoryMenu.appendChild(li);
@@ -100,18 +107,74 @@ class UIRenderer {
     this.renderTools();
   }
 
+  setActiveMenuCategory(category) {
+    if (!this.categoryMenu) return;
+    this.categoryMenu.querySelectorAll('li').forEach(item => {
+      item.classList.toggle('active', item.getAttribute('data-category') === category);
+    });
+  }
+
+  navigateToCategory(category) {
+    if (this.currentCategory !== 'all') this.showTools('all');
+    requestAnimationFrame(() => {
+      const section = [...this.toolsGrid.querySelectorAll('.category-section')]
+        .find(item => item.dataset.category === category);
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        this.setActiveMenuCategory(category);
+      } else {
+        this.showTools(category);
+      }
+    });
+  }
+
+  initScrollSpy() {
+    this.scrollObserver?.disconnect();
+    this.scrollObserver = null;
+    if (this.currentCategory !== 'all' || !('IntersectionObserver' in window)) return;
+
+    const sections = [...this.toolsGrid.querySelectorAll('.category-section[data-category]')]
+      .filter(section => !section.classList.contains('personal-section'));
+    if (!sections.length) return;
+
+    this.scrollObserver = new IntersectionObserver(entries => {
+      const visible = entries
+        .filter(entry => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible?.target?.dataset?.category) {
+        this.setActiveMenuCategory(visible.target.dataset.category);
+      }
+    }, { rootMargin: '-16% 0px -62% 0px', threshold: [0.05, 0.25, 0.6] });
+
+    sections.forEach(section => this.scrollObserver.observe(section));
+  }
+
   setSearchQuery(value) {
     this.searchQuery = typeof value === 'string' ? value.trim().toLocaleLowerCase() : '';
     this.renderTools();
   }
 
   toolMatchesSearch(tool, category) {
-    if (!this.searchQuery) return true;
+    return this.matchesQuery(tool, category, this.searchQuery);
+  }
+
+  matchesQuery(tool, category, value) {
+    const query = typeof value === 'string' ? value.trim().toLocaleLowerCase() : '';
+    if (!query) return true;
     const searchable = [tool?.name, tool?.url, category]
       .filter(value => typeof value === 'string')
       .join(' ')
       .toLocaleLowerCase();
-    return searchable.includes(this.searchQuery);
+    if (searchable.includes(query)) return true;
+
+    if (window.PinyinMatch && typeof tool?.name === 'string' && /^[a-z\s]+$/i.test(query)) {
+      try {
+        return window.PinyinMatch.match(tool.name, query) !== false;
+      } catch (error) {
+        return false;
+      }
+    }
+    return false;
   }
 
   renderTools() {
@@ -123,6 +186,29 @@ class UIRenderer {
     let visibleCount = 0;
 
     if (this.currentCategory === 'all') {
+      if (!this.searchQuery && this.personalizationManager) {
+        this.personalizationManager.getPersonalSections().forEach(personalSection => {
+          const section = document.createElement('section');
+          section.className = 'category-section personal-section';
+          section.dataset.personalSection = personalSection.key;
+          const heading = document.createElement('div');
+          heading.className = 'category-heading';
+          const icon = document.createElement('i');
+          icon.className = `bi ${personalSection.icon}`;
+          icon.setAttribute('aria-hidden', 'true');
+          const title = document.createElement('h2');
+          title.textContent = personalSection.title;
+          const count = document.createElement('span');
+          count.textContent = String(personalSection.entries.length);
+          heading.append(icon, title, count);
+          const grid = document.createElement('div');
+          grid.className = 'category-tools-grid personal-tools-grid';
+          personalSection.entries.forEach(entry => this.addToolItem(entry.tool, grid, entry.category));
+          section.append(heading, grid);
+          this.toolsGrid.appendChild(section);
+        });
+      }
+
       categories.forEach(category => {
         const tools = (navigationData[category] || [])
           .filter(tool => this.toolMatchesSearch(tool, category));
@@ -130,6 +216,7 @@ class UIRenderer {
 
         const section = document.createElement('section');
         section.className = 'category-section';
+        section.dataset.category = category;
         const heading = document.createElement('div');
         heading.className = 'category-heading';
         const title = document.createElement('h2');
@@ -141,7 +228,7 @@ class UIRenderer {
 
         const grid = document.createElement('div');
         grid.className = 'category-tools-grid';
-        tools.forEach(tool => this.addToolItem(tool, grid));
+        tools.forEach(tool => this.addToolItem(tool, grid, category));
         visibleCount += tools.length;
         section.append(heading, grid);
         this.toolsGrid.appendChild(section);
@@ -149,7 +236,7 @@ class UIRenderer {
     } else {
       const tools = (navigationData[this.currentCategory] || [])
         .filter(tool => this.toolMatchesSearch(tool, this.currentCategory));
-      tools.forEach(tool => this.addToolItem(tool, this.toolsGrid));
+      tools.forEach(tool => this.addToolItem(tool, this.toolsGrid, this.currentCategory));
       visibleCount = tools.length;
     }
 
@@ -162,6 +249,12 @@ class UIRenderer {
       hint.textContent = this.searchQuery ? '换个关键词，或使用右侧按钮搜索网络' : '点击右下角按钮添加第一个网站';
       emptyState.append(title, hint);
       this.toolsGrid.appendChild(emptyState);
+    }
+
+    if (this.currentCategory === 'all') {
+      requestAnimationFrame(() => this.initScrollSpy());
+    } else {
+      this.scrollObserver?.disconnect();
     }
   }
 
@@ -256,7 +349,7 @@ class UIRenderer {
   }
 
   // 添加工具项
-  addToolItem(tool, target = this.toolsGrid) {
+  addToolItem(tool, target = this.toolsGrid, category = '') {
     const toolItem = document.createElement('div');
     toolItem.className = 'tool-item glass-container hover-lift click-bounce';
     toolItem.dataset.id = tool.id || '';
@@ -273,6 +366,9 @@ class UIRenderer {
       linkElement.addEventListener('click', event => event.preventDefault());
     }
     linkElement.rel = 'noopener noreferrer';
+    linkElement.addEventListener('click', () => {
+      this.personalizationManager?.recordVisit(tool, true);
+    });
     if (tool && tool.name) {
       linkElement.title = tool.name;
     }
@@ -335,6 +431,27 @@ class UIRenderer {
     nameElement.textContent = name;
     linkElement.appendChild(nameElement);
 
+    let pinBtn = null;
+    if (this.personalizationManager) {
+      pinBtn = document.createElement('button');
+      pinBtn.type = 'button';
+      pinBtn.className = 'tool-item-pin-btn';
+      const pinned = this.personalizationManager.isPinned(tool);
+      pinBtn.classList.toggle('is-pinned', pinned);
+      pinBtn.setAttribute('aria-pressed', String(pinned));
+      pinBtn.setAttribute('aria-label', `${pinned ? '取消常用' : '加入常用'} ${name}`);
+      pinBtn.title = pinned ? '取消常用' : '加入常用';
+      const pinIcon = document.createElement('i');
+      pinIcon.className = pinned ? 'bi bi-star-fill' : 'bi bi-star';
+      pinIcon.setAttribute('aria-hidden', 'true');
+      pinBtn.appendChild(pinIcon);
+      pinBtn.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.personalizationManager.togglePin(tool);
+      });
+    }
+
     // 添加删除按钮
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'tool-item-delete-btn';
@@ -377,6 +494,7 @@ class UIRenderer {
     });
 
     toolItem.appendChild(linkElement);
+    if (pinBtn) toolItem.appendChild(pinBtn);
     toolItem.appendChild(refreshBtn);
     toolItem.appendChild(deleteBtn);
 
@@ -387,41 +505,30 @@ class UIRenderer {
   showLoadingAnimation() {
     if (!this.toolsGrid) return;
 
-    this.toolsGrid.innerHTML = `
-      <div class="loading-container" style="
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        height: 300px;
-        text-align: center;
-      ">
-        <div class="loading-spinner" style="
-          width: 40px;
-          height: 40px;
-          border: 4px solid #f3f3f3;
-          border-top: 4px solid #007bff;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin-bottom: 20px;
-        "></div>
-        <p style="color: #666; font-size: 16px; margin: 0;">正在加载导航数据...</p>
-      </div>
-      <style>
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      </style>
-    `;
+    this.toolsGrid.replaceChildren();
+    this.toolsGrid.classList.remove('grouped-view');
+    const skeletonGrid = document.createElement('div');
+    skeletonGrid.className = 'skeleton-grid';
+    skeletonGrid.setAttribute('aria-label', '正在加载导航数据');
+    skeletonGrid.setAttribute('aria-busy', 'true');
+    for (let index = 0; index < 8; index += 1) {
+      const card = document.createElement('div');
+      card.className = 'skeleton-card';
+      const icon = document.createElement('span');
+      icon.className = 'skeleton-icon';
+      const line = document.createElement('span');
+      line.className = 'skeleton-line';
+      card.append(icon, line);
+      skeletonGrid.appendChild(card);
+    }
+    this.toolsGrid.appendChild(skeletonGrid);
   }
 
   // 隐藏加载动画
   hideLoadingAnimation() {
     if (!this.toolsGrid) return;
 
-    const loadingContainer = this.toolsGrid.querySelector('.loading-container');
+    const loadingContainer = this.toolsGrid.querySelector('.skeleton-grid');
     if (loadingContainer) {
       loadingContainer.remove();
     }
