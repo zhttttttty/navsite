@@ -2680,13 +2680,6 @@ button:focus {
   min-width: 0;
 }
 
-.workspace-intro h1 {
-  margin: 0 0 4px;
-  color: var(--text-color);
-  font-size: clamp(24px, 2.3vw, 34px);
-  line-height: 1.1;
-}
-
 .workspace-intro p {
   margin: 0;
   color: var(--text-mid);
@@ -3146,6 +3139,43 @@ input {
   caret-color: var(--accent-color);
 }
 
+.user-avatar {
+  padding: 10px 0 4px;
+}
+
+.user-avatar img {
+  width: 52px;
+  height: 52px;
+  opacity: 0.52;
+  filter: saturate(0.55);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.user-avatar:hover img {
+  opacity: 0.78;
+  filter: saturate(0.85);
+  border-color: rgba(var(--neon-pink-rgb), 0.28);
+}
+
+.nav-menu {
+  margin-top: 16px;
+}
+
+.mobile-logo {
+  opacity: 0.68;
+}
+
+.mobile-logo img {
+  width: 26px;
+  height: 26px;
+  filter: saturate(0.65);
+}
+
+.mobile-logo span {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .main-content {
     padding: 14px 14px 88px;
@@ -3158,12 +3188,13 @@ input {
     border-radius: 18px;
   }
 
-  .workspace-intro h1 {
-    display: none;
-  }
-
   .workspace-intro p {
     font-size: 11px;
+  }
+
+  .sidebar .user-avatar img {
+    width: 44px;
+    height: 44px;
   }
 
   .current-time {
