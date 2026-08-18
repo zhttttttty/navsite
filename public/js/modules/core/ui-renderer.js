@@ -2,8 +2,9 @@
  * UI渲染器 - 处理DOM元素渲染、工具项生成、分类菜单等
  */
 class UIRenderer {
-  constructor(dataManager) {
+  constructor(dataManager, networkManager = null) {
     this.dataManager = dataManager;
+    this.networkManager = networkManager;
     this.currentCategory = 'all';
     this.searchQuery = '';
     this.faviconCache = new Map();
@@ -161,7 +162,7 @@ class UIRenderer {
   matchesQuery(tool, category, value) {
     const query = typeof value === 'string' ? value.trim().toLocaleLowerCase() : '';
     if (!query) return true;
-    const searchable = [tool?.name, tool?.url, category]
+    const searchable = [tool?.name, tool?.url, tool?.lanUrl, category]
       .filter(value => typeof value === 'string')
       .join(' ')
       .toLocaleLowerCase();
@@ -268,7 +269,7 @@ class UIRenderer {
       const hostname = urlObj.hostname;
 
       // 检查内存缓存
-      const cacheKey = `favicon_v2_${hostname}`;
+      const cacheKey = `favicon_v3_${urlObj.origin}`;
       if (!refresh && this.faviconCache.has(cacheKey)) {
         return this.faviconCache.get(cacheKey);
       }
@@ -299,6 +300,17 @@ class UIRenderer {
 
     try {
       const parsed = new URL(candidate.trim());
+      const supportedProtocol = ['http:', 'https:'].includes(parsed.protocol);
+      return supportedProtocol && !parsed.username && !parsed.password ? parsed.href : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  getSafeAssetUrl(value) {
+    if (typeof value !== 'string' || !value.trim()) return null;
+    try {
+      const parsed = new URL(value.trim(), window.location.origin);
       const supportedProtocol = ['http:', 'https:'].includes(parsed.protocol);
       return supportedProtocol && !parsed.username && !parsed.password ? parsed.href : null;
     } catch (error) {
@@ -368,7 +380,9 @@ class UIRenderer {
 
     // 创建链接元素
     const linkElement = document.createElement('a');
-    const safeUrl = this.getSafeUrl(tool?.url);
+    const safeUrl = this.networkManager?.resolveToolUrl(tool)
+      || this.getSafeUrl(tool?.url)
+      || this.getSafeUrl(tool?.lanUrl);
     linkElement.href = safeUrl || '#';
     if (safeUrl) {
       linkElement.target = '_blank';
@@ -388,9 +402,14 @@ class UIRenderer {
     const name = typeof tool?.name === 'string' && tool.name.trim() ? tool.name.trim() : '未命名网站';
     const fallbackIcon = this.createTextIcon(name);
     let primaryIcon = null;
+    const faviconTargets = [...new Set([
+      this.getSafeUrl(tool?.lanUrl),
+      this.getSafeUrl(tool?.url)
+    ].filter(Boolean))];
+    const fallbackIconUrls = faviconTargets.map(targetUrl => this.getFaviconUrl(targetUrl)).filter(Boolean);
 
     if (tool.icon && typeof tool.icon === 'string' && tool.icon.trim()) {
-      const safeIconUrl = this.getSafeUrl(tool.icon);
+      const safeIconUrl = this.getSafeAssetUrl(tool.icon);
       if (safeIconUrl) {
         primaryIcon = document.createElement('img');
         primaryIcon.src = safeIconUrl;
@@ -401,7 +420,7 @@ class UIRenderer {
 
     if (!primaryIcon) {
       // 尝试使用网站的favicon
-      const faviconUrl = this.getFaviconUrl(tool.url);
+      const faviconUrl = fallbackIconUrls.shift() || this.getFaviconUrl(safeUrl);
       if (faviconUrl) {
         primaryIcon = document.createElement('img');
         primaryIcon.src = faviconUrl;
@@ -419,6 +438,11 @@ class UIRenderer {
         primaryIcon.decoding = 'async';
         primaryIcon.referrerPolicy = 'no-referrer';
         const showFallback = () => {
+          const nextIconUrl = fallbackIconUrls.shift();
+          if (nextIconUrl) {
+            primaryIcon.src = nextIconUrl;
+            return;
+          }
           primaryIcon.style.display = 'none';
           fallbackIcon.style.display = 'flex';
           iconShell.classList.add('is-fallback');
@@ -445,11 +469,12 @@ class UIRenderer {
     nameElement.textContent = name;
     copyElement.appendChild(nameElement);
 
-    const hostname = this.getDisplayHostname(tool?.url);
+    const hostname = this.getDisplayHostname(safeUrl);
     if (hostname) {
       const domainElement = document.createElement('span');
       domainElement.className = 'tool-domain';
-      domainElement.textContent = hostname;
+      const isUsingLan = Boolean(tool?.lanUrl && safeUrl === this.getSafeUrl(tool.lanUrl));
+      domainElement.textContent = `${isUsingLan ? '内网 · ' : ''}${hostname}`;
       copyElement.appendChild(domainElement);
     }
 

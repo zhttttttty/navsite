@@ -174,6 +174,10 @@
           <div class="date-info" id="date-info">加载中...</div>
         </div>
         <div class="header-actions" aria-label="页面显示与管理">
+          <button id="network-mode-toggle" class="network-mode-toggle header-control-button" type="button" data-mode="auto" data-network="wan">
+            <i class="bi bi-router" aria-hidden="true"></i>
+            <span>自动 · 外网</span>
+          </button>
           <button id="view-mode-toggle" class="view-mode-toggle header-control-button" type="button" aria-pressed="false" title="切换到紧凑视图">
             <i class="bi bi-grid" aria-hidden="true"></i>
             <span>紧凑</span>
@@ -255,6 +259,12 @@
               </span>
               <button id="refresh-favicon-btn" type="button">重新抓取</button>
             </div>
+          </div>
+          <div class="form-group">
+            <label for="site-lan-url">内网地址（可选）</label>
+            <input type="url" id="site-lan-url" name="site-lan-url" placeholder="例如 http://192.168.1.10:8080">
+            <small class="form-hint">配置后，内网模式会优先打开此地址，并尝试获取 Docker 应用图标。</small>
+            <div class="error-message" id="lanUrl-error"></div>
           </div>
           <div class="form-group">
             <label for="site-name">网站名称 *</label>

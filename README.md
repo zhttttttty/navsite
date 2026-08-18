@@ -113,7 +113,11 @@
 
 📖 [查看配置指南 →](./doc/飞书多维表格设置.md)
 
-字段名称必须使用 `name`、`url`、`category`、`weight`；可选字段为 `icon`、`desc`、`visible`。其中 `url` 当前应设置为“单行文本”。字段名不一致会导致 `FieldNameNotFound`。
+字段名称必须使用 `name`、`url`、`category`、`weight`；可选字段为 `lanUrl`、`icon`、`desc`、`visible`。其中 `url` 和 `lanUrl` 应设置为“单行文本”。`url` 是外网地址，`lanUrl` 是内网地址；页面会自动判断网络，也可在顶部手动固定内网或外网。字段名不一致会导致 `FieldNameNotFound`。
+
+`icon` 推荐设置为“附件”字段，每条记录上传一张 PNG、JPEG、WebP、ICO 或 SVG 图片。后端会使用飞书访问令牌读取附件并通过同源地址缓存输出；旧的文本图片 URL 仍兼容。
+
+> 内网 Docker 图标由导航页后端从 `lanUrl` 对应应用的页面或 `/favicon.ico` 获取。要使用此能力，导航页后端需要部署在 NAS 或能访问该内网的设备上；Vercel 等公网运行环境无法直接访问家庭私网。
 
 示例数据可以看这里： [示例数据](https://pcnz0m411rr0.feishu.cn/base/QqmhbhUqRaGCjHs6l9XcKJtEnIc?table=tblva1FKxYGEZ7ce&view=vewbqWfrEv)
 

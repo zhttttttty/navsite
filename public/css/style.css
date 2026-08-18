@@ -4407,6 +4407,24 @@ body[data-view-mode="compact"] .tool-open-indicator {
   box-shadow: none;
 }
 
+.form-hint {
+  display: block;
+  margin-top: 7px;
+  color: var(--text-mid);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.network-mode-toggle[data-network="lan"] {
+  border-color: color-mix(in srgb, #22c55e 42%, transparent);
+  color: color-mix(in srgb, #22c55e 78%, var(--text-color));
+}
+
+.network-mode-toggle[data-mode="lan"],
+.network-mode-toggle[data-mode="wan"] {
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+}
+
 .header-actions #skin-selector {
   position: relative;
   flex: 0 0 44px;
