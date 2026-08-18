@@ -66,6 +66,7 @@ class LinkManager {
     // 实时验证
     const siteNameInput = document.getElementById('site-name');
     const siteUrlInput = document.getElementById('site-url');
+    const siteLanUrlInput = document.getElementById('site-lan-url');
     
     if (siteNameInput) {
       siteNameInput.addEventListener('input', () => {
@@ -110,6 +111,26 @@ class LinkManager {
       });
     }
 
+    if (siteLanUrlInput) {
+      siteLanUrlInput.addEventListener('input', () => {
+        const value = siteLanUrlInput.value.trim();
+        if (value) {
+          try {
+            const parsedUrl = new URL(value);
+            if (!['http:', 'https:'].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) {
+              throw new Error('unsupported URL');
+            }
+            this.clearFieldError('lanUrl');
+          } catch (error) {
+            this.showError('lanUrl', '无效的内网地址，仅支持http://或https://');
+          }
+        } else {
+          this.clearFieldError('lanUrl');
+        }
+        this.scheduleFaviconPreview();
+      });
+    }
+
     const refreshFaviconBtn = document.getElementById('refresh-favicon-btn');
     if (refreshFaviconBtn) {
       refreshFaviconBtn.addEventListener('click', () => this.updateFaviconPreview(true));
@@ -123,6 +144,7 @@ class LinkManager {
 
   updateFaviconPreview(forceRefresh = false) {
     const input = document.getElementById('site-url');
+    const lanInput = document.getElementById('site-lan-url');
     const preview = document.getElementById('favicon-preview');
     const image = document.getElementById('favicon-preview-image');
     const fallback = document.getElementById('favicon-preview-fallback');
@@ -132,7 +154,7 @@ class LinkManager {
 
     let parsedUrl;
     try {
-      parsedUrl = new URL(input.value.trim());
+      parsedUrl = new URL(lanInput?.value.trim() || input.value.trim());
       if (!['http:', 'https:'].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) {
         throw new Error('unsupported URL');
       }
@@ -273,6 +295,7 @@ class LinkManager {
   clearErrors() {
     this.clearFieldError('name');
     this.clearFieldError('url');
+    this.clearFieldError('lanUrl');
     this.clearFieldError('category');
   }
 
@@ -324,6 +347,19 @@ class LinkManager {
       }
     }
 
+    const siteLanUrl = document.getElementById('site-lan-url')?.value.trim() || '';
+    if (siteLanUrl) {
+      try {
+        const parsedLanUrl = new URL(siteLanUrl);
+        if (!['http:', 'https:'].includes(parsedLanUrl.protocol) || parsedLanUrl.username || parsedLanUrl.password) {
+          throw new Error('unsupported protocol');
+        }
+      } catch (error) {
+        this.showError('lanUrl', '无效的内网地址，仅支持http://或https://');
+        isValid = false;
+      }
+    }
+
     // 验证分类
     const siteCategory = document.getElementById('site-category').value;
     const customCategory = document.getElementById('custom-category').value.trim();
@@ -353,6 +389,7 @@ class LinkManager {
     // 收集表单数据
     const siteName = document.getElementById('site-name').value.trim();
     const siteUrl = document.getElementById('site-url').value.trim();
+    const siteLanUrl = document.getElementById('site-lan-url')?.value.trim() || '';
     const siteCategory = document.getElementById('site-category').value;
     const customCategory = document.getElementById('custom-category').value.trim();
     const siteSort = document.getElementById('site-sort').value ? parseInt(document.getElementById('site-sort').value) : 200;
@@ -366,6 +403,7 @@ class LinkManager {
     const formData = {
       name: siteName,
       url: siteUrl,
+      lanUrl: siteLanUrl,
       category: finalCategory,
       sort: siteSort
     };

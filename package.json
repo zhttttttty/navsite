@@ -9,7 +9,7 @@
     "postinstall": "node scripts/copy-vendor.js",
     "vendor": "node scripts/copy-vendor.js",
     "icons": "node scripts/generate-icons.js",
-    "check": "node --check server.js && node --check public/sw.js && node --check public/js/app.js && node --check public/js/modules/core/data-manager.js && node --check public/js/modules/core/pwa-manager.js && node --check public/js/modules/core/theme-manager.js && node --check public/js/modules/core/ui-renderer.js && node --check public/js/modules/features/command-palette.js && node --check public/js/modules/features/interaction-manager.js && node --check public/js/modules/features/link-manager.js && node --check public/js/modules/features/personalization-manager.js && node --check public/js/modules/utils/common-utils.js",
+    "check": "node --check server.js && node --check public/sw.js && node --check public/js/app.js && node --check public/js/modules/core/data-manager.js && node --check public/js/modules/core/network-manager.js && node --check public/js/modules/core/pwa-manager.js && node --check public/js/modules/core/theme-manager.js && node --check public/js/modules/core/ui-renderer.js && node --check public/js/modules/features/command-palette.js && node --check public/js/modules/features/interaction-manager.js && node --check public/js/modules/features/link-manager.js && node --check public/js/modules/features/personalization-manager.js && node --check public/js/modules/utils/common-utils.js",
     "test": "node --test",
     "verify": "npm run check && npm test && npm audit --omit=dev --audit-level=high",
     "build": "echo 'No build step required'",

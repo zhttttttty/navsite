@@ -10,6 +10,7 @@ function loadModules() {
     '/js/modules/core/pwa-manager.js',
     '/js/modules/core/theme-manager.js', 
     '/js/modules/core/data-manager.js',
+    '/js/modules/core/network-manager.js',
     '/js/modules/core/ui-renderer.js',
     
     // 功能模块
@@ -40,6 +41,7 @@ let dataManager = null;
 let uiRenderer = null;
 let themeManager = null;
 let pwaManager = null;
+let networkManager = null;
 let linkManager = null;
 let interactionManager = null;
 let personalizationManager = null;
@@ -113,9 +115,13 @@ async function initCoreModules() {
   // 初始化数据管理器
   dataManager = new window.DataManager();
   window.dataManager = dataManager; // 设置全局引用
+
+  networkManager = new window.NetworkManager();
+  window.networkManager = networkManager;
+  await networkManager.init();
   
   // 初始化UI渲染器
-  uiRenderer = new window.UIRenderer(dataManager);
+  uiRenderer = new window.UIRenderer(dataManager, networkManager);
   window.uiRenderer = uiRenderer; // 设置全局引用
   
   // 立即更新时间信息
@@ -200,6 +206,10 @@ function bindEventListeners() {
     uiRenderer.generateCategoryMenu();
     uiRenderer.showTools(uiRenderer.getCurrentCategory());
     if (event.detail?.dateInfo) uiRenderer.updateDateInfo(event.detail.dateInfo);
+  });
+
+  window.addEventListener('networkModeChanged', () => {
+    uiRenderer.renderTools();
   });
 
   bindSearchControls();

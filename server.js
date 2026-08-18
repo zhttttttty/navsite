@@ -2,6 +2,7 @@ require('dotenv').config({ quiet: true });
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
+const dns = require('node:dns').promises;
 const axios = require('axios');
 const { rateLimit } = require('express-rate-limit');
 const { Lunar } = require('lunar-javascript');
@@ -59,6 +60,9 @@ let tokenExpireTime = null;
 const faviconCache = new Map();
 const FAVICON_CACHE_TTL = 24 * 60 * 60 * 1000;
 const FAVICON_CACHE_LIMIT = 250;
+const allowedLanTargets = new Set();
+const feishuIconSources = new Map();
+const feishuIconCache = new Map();
 const NAVIGATION_AVATAR_URL = 'https://t.alcy.cc/ycy/';
 const NAVIGATION_AVATAR_CACHE_TTL = 30 * 60 * 1000;
 let navigationAvatarCache = null;
@@ -119,6 +123,208 @@ function parseHttpUrl(value) {
   } catch (error) {
     return null;
   }
+}
+
+function normalizeIpAddress(value) {
+  const firstValue = String(value || '').split(',')[0].trim().replace(/^\[|\]$/g, '');
+  return firstValue.toLowerCase().startsWith('::ffff:') ? firstValue.slice(7) : firstValue;
+}
+
+function isPrivateNetworkAddress(value) {
+  const address = normalizeIpAddress(value);
+  if (!address) return false;
+  if (address === '::1' || address === 'localhost') return true;
+  if (/^(fc|fd)[0-9a-f]{2}:/i.test(address) || /^fe[89ab][0-9a-f]:/i.test(address)) return true;
+
+  const octets = address.split('.').map(Number);
+  if (octets.length !== 4 || octets.some(octet => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+    return false;
+  }
+
+  return octets[0] === 10
+    || octets[0] === 127
+    || (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31)
+    || (octets[0] === 192 && octets[1] === 168)
+    || (octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127);
+}
+
+function isPrivateNetworkHostname(value) {
+  const hostname = String(value || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
+  return isPrivateNetworkAddress(hostname) || hostname === 'localhost' || hostname.endsWith('.local');
+}
+
+function getClientNetworkInfo(req) {
+  const forwardedAddress = req.get('x-forwarded-for');
+  const clientAddress = normalizeIpAddress(forwardedAddress || req.socket?.remoteAddress || req.ip);
+  const forwardedHost = String(req.get('x-forwarded-host') || '').split(',')[0].trim();
+  const requestHost = forwardedHost || req.hostname || req.get('host') || '';
+  const hostname = requestHost.replace(/^\[|\](:\d+)?$/g, '').replace(/:\d+$/, '');
+  const addressIsLan = isPrivateNetworkAddress(clientAddress);
+  const hostnameIsLan = isPrivateNetworkHostname(hostname);
+
+  return {
+    isLan: addressIsLan || hostnameIsLan,
+    reason: addressIsLan ? 'private_client_ip' : hostnameIsLan ? 'private_hostname' : 'public_network',
+    clientAddress,
+    hostname
+  };
+}
+
+function rememberAllowedLanTargets(groupedData) {
+  allowedLanTargets.clear();
+  Object.values(groupedData || {}).flat().forEach(record => {
+    const parsed = parseHttpUrl(record?.lanUrl);
+    if (parsed) allowedLanTargets.add(parsed.href);
+  });
+}
+
+function getFeishuAttachmentSource(value) {
+  if (!Array.isArray(value)) return null;
+  const attachment = value.find(item => {
+    const type = String(item?.type || '').toLowerCase();
+    return item?.file_token && (type.startsWith('image/') || /\.(?:png|jpe?g|gif|webp|ico|svg)$/i.test(item?.name || ''));
+  });
+  if (!attachment) return null;
+
+  let downloadUrl = '';
+  try {
+    const parsed = new URL(attachment.url || '');
+    const expectedPath = `/open-apis/drive/v1/medias/${encodeURIComponent(attachment.file_token)}/download`;
+    if (parsed.protocol === 'https:' && parsed.hostname === 'open.feishu.cn' && parsed.pathname === expectedPath) {
+      downloadUrl = parsed.href;
+    }
+  } catch (error) {
+    // Fall back to the documented media download endpoint below.
+  }
+
+  return {
+    fileToken: String(attachment.file_token),
+    contentType: String(attachment.type || ''),
+    downloadUrl: downloadUrl
+      || `https://open.feishu.cn/open-apis/drive/v1/medias/${encodeURIComponent(attachment.file_token)}/download`
+  };
+}
+
+function rememberFeishuIconSources(groupedData) {
+  feishuIconSources.clear();
+  Object.values(groupedData || {}).flat().forEach(record => {
+    if (record?._iconAttachment && /^[A-Za-z0-9_-]{1,128}$/.test(record.id || '')) {
+      feishuIconSources.set(record.id, record._iconAttachment);
+    }
+  });
+}
+
+async function fetchFeishuIcon(source, accessToken, client = axios, forceRefresh = false) {
+  if (!source?.fileToken || !source?.downloadUrl || !accessToken) {
+    throw new Error('飞书图标下载参数不完整');
+  }
+  const cacheKey = source.fileToken;
+  const cached = feishuIconCache.get(cacheKey);
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) return cached;
+
+  const response = await client.get(source.downloadUrl, {
+    responseType: 'arraybuffer',
+    timeout: 8000,
+    maxContentLength: 5 * 1024 * 1024,
+    maxRedirects: 0,
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const responseContentType = String(response.headers?.['content-type'] || '').split(';')[0];
+  const contentType = responseContentType.startsWith('image/') ? responseContentType : source.contentType;
+  if (!contentType.startsWith('image/') || !response.data || response.data.length < 32) {
+    throw new Error('飞书附件不是有效图片');
+  }
+
+  const result = { data: response.data, contentType, expiresAt: Date.now() + FAVICON_CACHE_TTL };
+  if (feishuIconCache.size >= FAVICON_CACHE_LIMIT) feishuIconCache.delete(feishuIconCache.keys().next().value);
+  feishuIconCache.set(cacheKey, result);
+  return result;
+}
+
+async function resolvesToPrivateNetwork(hostname, resolver = dns.lookup) {
+  if (isPrivateNetworkHostname(hostname)) return true;
+  try {
+    const addresses = await resolver(hostname, { all: true, verbatim: true });
+    return Array.isArray(addresses)
+      && addresses.length > 0
+      && addresses.every(result => isPrivateNetworkAddress(result.address));
+  } catch (error) {
+    return false;
+  }
+}
+
+function getIconCandidates(html, targetUrl) {
+  const candidates = [];
+  const linkPattern = /<link\b[^>]*>/gi;
+  const hrefPattern = /\bhref\s*=\s*["']([^"']+)["']/i;
+  const relPattern = /\brel\s*=\s*["']([^"']+)["']/i;
+  for (const tag of String(html || '').match(linkPattern) || []) {
+    const rel = tag.match(relPattern)?.[1] || '';
+    const href = tag.match(hrefPattern)?.[1];
+    if (!href || !/\b(?:icon|apple-touch-icon)\b/i.test(rel)) continue;
+    try {
+      const candidate = new URL(href, targetUrl);
+      if (candidate.origin === targetUrl.origin && ['http:', 'https:'].includes(candidate.protocol)) {
+        candidates.push(candidate.href);
+      }
+    } catch (error) {
+      // Ignore malformed icon declarations and continue with conventional paths.
+    }
+  }
+  candidates.push(new URL('/favicon.ico', targetUrl.origin).href);
+  return [...new Set(candidates)].slice(0, 6);
+}
+
+async function fetchDirectFavicon(value, client = axios, resolver = dns.lookup, forceRefresh = false) {
+  const targetUrl = parseHttpUrl(value);
+  if (!targetUrl || !await resolvesToPrivateNetwork(targetUrl.hostname, resolver)) {
+    throw new Error('内网图标目标无效或不在私有网络');
+  }
+
+  const cacheKey = `direct:${targetUrl.origin}`;
+  const cached = faviconCache.get(cacheKey);
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) return cached;
+
+  let html = '';
+  try {
+    const pageResponse = await client.get(targetUrl.href, {
+      responseType: 'text',
+      timeout: 3500,
+      maxContentLength: 256 * 1024,
+      maxRedirects: 0,
+      validateStatus: status => status >= 200 && status < 300
+    });
+    if (String(pageResponse.headers?.['content-type'] || '').includes('text/html')) {
+      html = pageResponse.data;
+    }
+  } catch (error) {
+    // Many appliances block their home page while still serving /favicon.ico.
+  }
+
+  let lastError;
+  for (const iconUrl of getIconCandidates(html, targetUrl)) {
+    try {
+      const response = await client.get(iconUrl, {
+        responseType: 'arraybuffer',
+        timeout: 3500,
+        maxContentLength: 1024 * 1024,
+        maxRedirects: 0,
+        validateStatus: status => status >= 200 && status < 300
+      });
+      const contentType = String(response.headers?.['content-type'] || '').split(';')[0];
+      if (!contentType.startsWith('image/') || !response.data || response.data.length < 32) {
+        throw new Error('内网服务返回了无效图标');
+      }
+      const result = { data: response.data, contentType, expiresAt: Date.now() + FAVICON_CACHE_TTL };
+      if (faviconCache.size >= FAVICON_CACHE_LIMIT) faviconCache.delete(faviconCache.keys().next().value);
+      faviconCache.set(cacheKey, result);
+      return result;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('未找到内网应用图标');
 }
 
 async function fetchFavicon(hostname, size, client = axios, forceRefresh = false) {
@@ -316,6 +522,10 @@ function processTableData(items) {
     const localizedUrl = fields.网址;
     const rawUrl = fields.url || (typeof localizedUrl === 'string' ? localizedUrl : localizedUrl?.link) || '';
     const rawName = fields.name || fields.站点名称 || '';
+    const localizedLanUrl = fields.内网地址;
+    const rawLanUrl = fields.lanUrl
+      || (typeof localizedLanUrl === 'string' ? localizedLanUrl : localizedLanUrl?.link)
+      || '';
     // 如果站点名称和网址都为空，则跳过该记录
     if (!rawName && !rawUrl) {
       return null;
@@ -323,14 +533,22 @@ function processTableData(items) {
     const rawSort = fields.sort ?? fields.weight ?? fields.排序 ?? 0;
     const numericSort = Number(rawSort);
     const localizedIcon = fields.备用图标;
-    return {
+    const iconAttachment = getFeishuAttachmentSource(fields.icon);
+    const record = {
       id: item.record_id, // 添加记录ID
       name: normalizeText(rawName, 50),
       url: typeof rawUrl === 'string' ? rawUrl.trim() : '',
       category: normalizeText(fields.category || fields.分类 || '其它', 20) || '其它',
       sort: Number.isFinite(numericSort) ? numericSort : 0,
-      icon: fields?.icon?.link || localizedIcon?.link || ''
+      lanUrl: typeof rawLanUrl === 'string' ? rawLanUrl.trim() : '',
+      icon: iconAttachment ? `/api/feishu-icon/${encodeURIComponent(item.record_id)}` : (typeof fields.icon === 'string' ? fields.icon : fields?.icon?.link)
+        || (typeof localizedIcon === 'string' ? localizedIcon : localizedIcon?.link)
+        || ''
     };
+    if (iconAttachment) {
+      Object.defineProperty(record, '_iconAttachment', { value: iconAttachment, enumerable: false });
+    }
+    return record;
   }).filter(record => record !== null); // 过滤掉空记录
 
   // 按分类分组
@@ -389,11 +607,15 @@ app.get('/api/navigation', async (req, res) => {
       const token = await getTenantAccessToken();
       const items = await getBitableData(token);
       data = processTableData(items);
+      rememberAllowedLanTargets(data);
+      rememberFeishuIconSources(data);
       categories = Object.keys(data);
     } catch (apiError) {
       console.warn('无法从飞书API获取数据，使用模拟数据:', getSafeExternalError(apiError));
       // 使用模拟数据
       data = mockData;
+      rememberAllowedLanTargets(data);
+      rememberFeishuIconSources(data);
       categories = Object.keys(mockData);
       isMockData = true;
     }
@@ -441,6 +663,39 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+app.get('/api/network-status', (req, res) => {
+  const network = getClientNetworkInfo(req);
+  res.set('Cache-Control', 'no-store');
+  res.json({ success: true, ...network });
+});
+
+app.get('/api/feishu-icon/:recordId', async (req, res) => {
+  try {
+    const recordId = req.params.recordId;
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(recordId || '')) {
+      return res.status(400).json({ success: false, message: '记录ID格式无效' });
+    }
+    const accessToken = await getTenantAccessToken();
+    let source = feishuIconSources.get(recordId);
+    if (!source) {
+      const items = await getBitableData(accessToken);
+      const data = processTableData(items);
+      rememberFeishuIconSources(data);
+      source = feishuIconSources.get(recordId);
+    }
+    if (!source) {
+      return res.status(404).json({ success: false, message: '未找到图标附件' });
+    }
+    const icon = await fetchFeishuIcon(source, accessToken, axios, Boolean(req.query.refresh));
+    res.set('Content-Type', icon.contentType);
+    res.set('Cache-Control', 'private, max-age=3600, stale-while-revalidate=86400');
+    res.send(icon.data);
+  } catch (error) {
+    console.error('飞书图标代理错误:', getSafeExternalError(error));
+    res.status(502).json({ success: false, code: 'FEISHU_ICON_UNAVAILABLE', message: '飞书图标暂时不可用' });
+  }
+});
+
 // Favicon代理端点
 app.get('/api/favicon', async (req, res) => {
   try {
@@ -463,7 +718,16 @@ app.get('/api/favicon', async (req, res) => {
     
     const requestedSize = Number.parseInt(req.query.size, 10);
     const faviconSize = [32, 64, 128].includes(requestedSize) ? requestedSize : 64;
-    const favicon = await fetchFavicon(parsedUrl.hostname, faviconSize, axios, Boolean(req.query.refresh));
+    let favicon;
+    if (allowedLanTargets.has(parsedUrl.href) && await resolvesToPrivateNetwork(parsedUrl.hostname)) {
+      try {
+        favicon = await fetchDirectFavicon(parsedUrl.href, axios, dns.lookup, Boolean(req.query.refresh));
+      } catch (error) {
+        favicon = await fetchFavicon(parsedUrl.hostname, faviconSize, axios, Boolean(req.query.refresh));
+      }
+    } else {
+      favicon = await fetchFavicon(parsedUrl.hostname, faviconSize, axios, Boolean(req.query.refresh));
+    }
 
     res.set('Content-Type', favicon.contentType);
     res.set('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
@@ -520,6 +784,7 @@ app.post('/api/links', adminWriteLimiter, requireAdmin, async (req, res) => {
     const name = normalizeText(requestBody.name, 50);
     const category = normalizeText(requestBody.category, 20);
     const parsedUrl = parseHttpUrl(requestBody.url);
+    const parsedLanUrl = requestBody.lanUrl ? parseHttpUrl(requestBody.lanUrl) : null;
     const numericSort = Number(requestBody.sort ?? 200);
 
     // 验证必要的字段
@@ -557,6 +822,13 @@ app.post('/api/links', adminWriteLimiter, requireAdmin, async (req, res) => {
         message: '无效的网址格式，仅支持http://或https://'
       });
     }
+
+    if (requestBody.lanUrl && !parsedLanUrl) {
+      return res.status(400).json({
+        success: false,
+        message: '内网地址格式无效，仅支持http://或https://'
+      });
+    }
     
     // 验证网站名称长度
     if (String(requestBody.name).trim().length > 50) {
@@ -585,6 +857,7 @@ app.post('/api/links', adminWriteLimiter, requireAdmin, async (req, res) => {
         weight: numericSort
       }
     };
+    if (parsedLanUrl) createRecordBody.fields.lanUrl = parsedLanUrl.href;
     
     // 调用飞书多维表格API创建记录
     const response = await axios.post(
@@ -688,9 +961,14 @@ module.exports = app;
 module.exports._test = {
   constantTimeEqual,
   fetchFavicon,
+  fetchDirectFavicon,
+  fetchFeishuIcon,
   fetchNavigationAvatar,
   getBitableData,
   getConfigurationStatus,
+  getFeishuAttachmentSource,
+  getClientNetworkInfo,
+  isPrivateNetworkAddress,
   parseHttpUrl,
   processTableData,
   requireAdmin
